@@ -1,81 +1,67 @@
-# Brainstorm: 2026-05-05
+# Mortar: Initial Design Session — 2026-05-05
 
-Initial ideation session that produced the Mortar concept.
+## What Mortar is
 
-## Starting point
+A unified frontend for homelab media stacks. One UI, consistent design, for household members who don't know what Sonarr is. Mortar is the front door — it connects to existing services via their APIs and presents the daily-use workflows in one place, without replacing anything.
 
-Nathan runs a mature single-node k3s homelab (Ansible + Argo CD, GitOps) with a full media stack: Jellyfin, Sonarr/Radarr/Lidarr, Prowlarr, SABnzbd/qBittorrent, Jellyseerr, Bazarr, Recyclarr, Audiobookshelf, Calibre + Calibre-Web, Storyteller, Home Assistant, and Ollama with Nvidia GPU passthrough.
+## Problem it solves
 
-He wanted to brainstorm a fun upstream open-source contribution to the homelab/media server community.
+A typical homelab media stack runs 10–20 services, each with its own UI, auth, and design language. The homelab owner navigates this fluently. Everyone else is lost. No existing tool addresses this: Homarr and Homepage are link aggregators for the owner, not usable interfaces for the household.
 
-## Ideas considered
+## Core design decisions
 
-### 1. Declarative stack wiring tool
+### Plugin-first, not ecosystem-first
 
-A CLI/container that reads a config declaring service URLs and desired inter-service connections, then idempotently wires them together via each app's API (e.g. Prowlarr → Sonarr, Sonarr → SABnzbd).
+Every integration is a plugin with a standard capability interface. Mortar is not an *arr tool and is not built on the Servarr ecosystem. The *arr apps (Sonarr, Radarr, Lidarr) are important plugins but not privileged ones. This was a deliberate choice:
 
-**Research finding:** Configarr (592 stars, active) covers quality profiles and custom formats but explicitly does NOT handle inter-service wiring. GitHub issue #264 is an open request for this. The gap is real.
+- Servarr apps are backends, not a framework — there is nothing to actually build on
+- Mortar's stack includes Jellyfin, Audiobookshelf, SABnzbd, and Jellyseerr, none of which are Servarr projects
+- Centering on Servarr would signal the wrong audience and create coupling without leverage
+- The plugin model works whether you use the full *arr stack, a partial one, or none at all
 
-**Why we moved on:** This is more of an infrastructure/devops tool. The unified UI idea was more exciting.
+### Build on top of Jellyseerr for video requests, not around it
 
-### 2. Book/audiobook request portal
+Considered going directly to Sonarr/Radarr for the request flow. Decision: use Jellyseerr's API instead. Jellyseerr already handles approval logic, user quotas, "already exists" detection, and notifications. Mortar does not rewrite that.
 
-An Overseerr-equivalent for ebooks and audiobooks.
-
-**Research finding:** AudioBookRequest (645 stars, active) covers audiobooks via Prowlarr. Shelfarr (131 stars, early) is attempting a unified books + audiobooks portal. Libreseerr exists but is low-activity. The space is more crowded than expected.
-
-**Why we moved on:** First-mover advantage is gone. Contributing to Shelfarr might be better than building from scratch.
-
-### 3. Unified activity feed
-
-A webhook aggregator that receives events from all *arr apps and presents a normalized timeline.
-
-**Status:** Good idea, relatively low effort, but felt like a smaller project. Kept as a feature within Mortar rather than a standalone project.
-
-### 4. Mortar (chosen direction)
-
-A unified frontend for the whole homelab media stack — one UI, consistent design, for household members who don't know what Sonarr is.
-
-## Key design decisions
-
-### Plugin-first, not *arr-first
-
-Mortar is not an *arr tool. Every integration is a plugin with standard capability interfaces. This keeps it ecosystem-agnostic and extensible.
-
-### Build on top of Seerr, not around it
-
-Initially considered going directly to Sonarr/Radarr for requests. Decision: use Jellyseerr's API for video requests instead. Jellyseerr handles approval logic, user quotas, "already exists" detection, and notifications. Mortar doesn't need to rewrite that.
-
-This also meant the architecture is naturally multi-backend for requests: Jellyseerr for video, AudioBookRequest for audiobooks, Shelfarr for ebooks — each a plugin.
+This naturally extends to other request types: AudioBookRequest for audiobooks, Shelfarr for ebooks. Each is a plugin. Jellyseerr is not special — it is the first `requests.video` plugin.
 
 ### Front door, not replacement
 
-Mortar is not a replacement for any service. Complex workflows stay in native apps. Mortar owns exactly five user flows: search/request, activity feed, download queue, browse/play, health.
+Mortar owns exactly five user flows: search/request, activity feed, download queue, browse/play, health. Everything else is a link to the native app. Complex operations (quality profiles, indexer management, download client config) stay in Sonarr, Radarr, SABnzbd, etc.
 
-### Target audience: household users, not power users
+### Target audience: household users, not the homelab owner
 
-The differentiator from Homarr/Homepage (which are link aggregators for the homelab owner) is that Mortar targets household members who want to request and watch media without understanding the underlying stack.
+The differentiator from Homarr/Homepage is audience. Mortar is built for a spouse, kids, or roommates who want to request and watch media — not for the person who built the stack. Non-technical users should never need to know what Sonarr is.
 
 ## What Mortar is NOT
 
-- Not an iframe wrapper (Organizr tried this, bad UX)
-- Not a replacement for Sonarr, Radarr, Jellyfin, etc.
-- Not a power-user tool for complex configuration
-- Not limited to the *arr ecosystem (hence the name "Mortar" not "Somethingarr")
+- Not an iframe wrapper — Organizr proved this approach produces bad UX
+- Not a replacement for any underlying service
+- Not a power-user configuration tool
+- Not tied to the *arr ecosystem (hence "Mortar", not "Somethingarr")
+- Not a media server — no transcoding, no storage opinions
 
 ## Name
 
-"Mortar" — the material that holds bricks together. Chosen because:
-- It's the connective layer between services
-- Not tied to any ecosystem naming convention
-- Short, memorable, one word, easily Googleable
-- Evokes binding/aggregation without being prescriptive
+"Mortar" — the material that holds bricks together. The connective layer between services. Short, memorable, not tied to any ecosystem naming convention.
 
-Rejected names: Stitch, Rivet, Weave (HashiCorp conflict), Plumbr, Linkarr.
+Rejected: Stitch, Rivet, Weave (HashiCorp conflict), Plumbr, Linkarr.
 
-## Open questions at close of session
+## Competitive landscape
 
-- Tech stack: TypeScript/Next.js full-stack vs. Go backend + React frontend
-- Database: SQLite for user accounts and request cache?
-- Real-time updates: WebSocket/SSE vs. polling for downloads and activity
-- Caching strategy for upstream service responses
+| Tool | What it does | Why Mortar is different |
+|---|---|---|
+| Homarr / Homepage | Link aggregator with status widgets | Owner-facing, no interactive workflows |
+| Organizr | iframe tab wrapper | Inconsistent UX, auth problems, mobile broken |
+| Jellyseerr | Request portal for video only | Single-service, not a unified frontend |
+| AudioBookRequest | Request portal for audiobooks only | Single-service |
+| Overseerr | Request portal for video only | No book support, not planned |
+
+## Open questions
+
+- **Tech stack:** TypeScript/Next.js full-stack vs. Go backend + React frontend
+- **Database:** SQLite for user accounts and request status cache?
+- **Real-time updates:** WebSocket/SSE vs. polling for downloads and activity feed
+- **Caching:** How aggressively to cache upstream plugin responses
+- **Audiobookshelf in browse view:** Separate section or merged with Jellyfin library?
+- **Guest playback:** Can non-Jellyfin users get a play link, or do they need a Jellyfin account?
