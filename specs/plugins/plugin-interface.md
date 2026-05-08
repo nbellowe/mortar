@@ -38,11 +38,18 @@ interface Plugin {
 }
 
 interface HealthStatus {
+  status: "unknown" | "healthy" | "degraded" | "unreachable";
   reachable: boolean;
   latency_ms: number;
   checked_at: string; // ISO 8601
   detail?: string;    // error message if not reachable
 }
+
+// status derivation:
+// "unknown"     — plugin has not been checked since server startup (no snapshot row)
+// "healthy"     — reachable, latency_ms <= 2000
+// "degraded"    — reachable, latency_ms > 2000
+// "unreachable" — not reachable (reachable: false)
 ```
 
 Health is a mandatory base contract, not a capability flag.
@@ -75,8 +82,12 @@ interface RequestReview {
 interface LibraryBrowsable {
   browse(options: BrowseOptions): Promise<PagedResult<MediaItem>>;
   getItem(id: string): Promise<MediaItem | null>;
-  getPlayUrl(item: MediaItem, user: MortarUser): Promise<string>; // deep link to player
+  getPlayUrl(item: MediaItem, user: MortarUser): Promise<string>; // deep link URI for external player handoff
 }
+
+// getPlayUrl: the plugin resolves the user's identity for the upstream service by finding
+// the ExternalAccountLink in user.external_accounts where plugin_id matches its own manifest.id.
+// If no matching link exists, the plugin should reject — Mortar gates this call on link presence.
 
 interface BrowseOptions {
   type?: MediaType;
@@ -168,6 +179,9 @@ type ActivityEventType =
   | "deleted";
 
 type ActivityVisibility = "all_users" | "admin_only" | "requester_and_admin";
+
+// For events with visibility "requester_and_admin", actor_user_id MUST be set to the
+// Mortar user ID of the requester. Mortar uses it to decide per-user event visibility.
 ```
 
 ## Shared types
@@ -190,7 +204,7 @@ interface MediaItem {
   asin?: string;          // for audiobooks
 }
 
-type MediaType = "movie" | "show" | "audiobook" | "ebook" | "music";
+type MediaType = "movie" | "show" | "audiobook" | "ebook";
 
 interface Request {
   id: string;

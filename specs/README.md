@@ -18,6 +18,7 @@ This directory is the source of truth for what Mortar builds. All features begin
 - [Search & Request](features/requests.md) — unified search and request flow
 - [Activity Feed](features/activity-feed.md) — cross-service event timeline
 - [Download Queue](features/download-queue.md) — unified download progress view
+- [Home](features/home.md) — dashboard rows and health badge
 - [Browse & Play](features/browse-play.md) — library browsing and playback handoff
 - [Service Health](features/health.md) — plugin connectivity dashboard
 

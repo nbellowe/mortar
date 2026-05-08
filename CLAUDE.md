@@ -4,7 +4,7 @@
 
 Mortar is a unified frontend for homelab media stacks. It aggregates daily-use workflows (search, request, browse, track) from multiple self-hosted services into one consistent UI. It does not replace any underlying service — it connects to them via their APIs.
 
-Two audiences: **household users** (non-technical, just want to request and watch things) and **the homelab owner** (configures plugins, sees operational views).
+Primary product audiences: **household users** (non-technical, just want to request and watch things) and **the homelab owner** (configures plugins, sees operational views). Contributor-facing docs are tracked separately.
 
 ## Spec-driven development
 
@@ -30,6 +30,7 @@ specs/
     requests.md          — search & request flow
     activity-feed.md     — cross-service event timeline
     download-queue.md    — unified download progress view
+    home.md              — dashboard rows and health badge
     browse-play.md       — library browsing and playback handoff
     health.md            — service health dashboard
 docs/
@@ -82,10 +83,10 @@ These are unresolved decisions that must be made before implementation begins. D
 |---|---|---|
 | Tech stack: Go backend + Expo (React Native) frontend | **RESOLVED** — see `specs/architecture.md` and `docs/sessions/2026-05-07-tech-stack.md` | — |
 | Persistence and state model | **RESOLVED** — see `docs/adrs/0002-persistence-and-state.md` and `docs/sessions/2026-05-07-persistence-state.md` | Auth, request history, health snapshots |
-| Real-time delivery model | **PROPOSED** — see `docs/adrs/0003-realtime-updates.md` | Activity feed, download queue, health freshness |
-| Plugin response caching | **PROPOSED** — see `docs/adrs/0004-plugin-response-caching.md` | All plugin reads |
-| Upstream user identity linking | **PROPOSED** — see `docs/adrs/0005-upstream-user-identity-linking.md` | Browse & play, continue watching, per-user activity |
-| Request routing policy | **PROPOSED** — see `docs/adrs/0006-request-routing-policy.md` | Search & request |
+| Real-time delivery model | **RESOLVED** — see `docs/adrs/0003-realtime-updates.md` and `docs/sessions/2026-05-07-realtime-updates.md` | Activity feed, download queue, health freshness |
+| Plugin response caching | **RESOLVED** — see `docs/adrs/0004-plugin-response-caching.md` and `docs/sessions/2026-05-07-plugin-response-caching.md` | All plugin reads |
+| Upstream user identity linking | **RESOLVED** — see `docs/adrs/0005-upstream-user-identity-linking.md` and `docs/sessions/2026-05-07-upstream-identity-linking.md` | Browse & play, continue watching, per-user activity |
+| Request routing policy | **RESOLVED** — see `docs/adrs/0006-request-routing-policy.md` and `docs/sessions/2026-05-07-request-routing.md` | Search & request |
 
 ## Tech stack
 

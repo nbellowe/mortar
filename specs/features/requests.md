@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Status:** `blocked`
+- **Status:** `accepted`
 - **Depends on:** [Plugin Interface](../plugins/plugin-interface.md), [ADR 0002](../../docs/adrs/0002-persistence-and-state.md), [ADR 0004](../../docs/adrs/0004-plugin-response-caching.md), [ADR 0006](../../docs/adrs/0006-request-routing-policy.md)
 - **Last updated:** `2026-05-07`
 
@@ -17,7 +17,7 @@ A household user can find any media — movie, show, audiobook, ebook — and re
 1. User types a query into the global search box.
 2. Mortar fans the query out to all plugins with a `requests.*` capability simultaneously.
 3. Results are normalized into `MediaItem` and deduplicated (same TMDB/IMDB/ASIN ID from multiple plugins = one result).
-4. Results are grouped by type: Movies, Shows, Audiobooks, Ebooks.
+4. Results are grouped by type: Movies, Shows, Audiobooks, Ebooks, limited to the request capabilities available in the current install.
 5. Each result shows: poster, title, year, type, and status badge (see below).
 
 ### Status badge
@@ -40,19 +40,23 @@ Each result displays one of:
 
 ### Request status tracking
 
-- Users can view their own request history.
-- Admins can view all requests across all users.
+- All users can view all pending and historical requests.
 - Mortar keeps durable local request snapshots for request history, duplicate-request checks, and faster views.
 - Upstream request plugins remain the source of truth for current request status and review actions.
+- Mortar does not provide an approve/deny UI. Admins who need to action a request are linked out to the upstream service (e.g., Jellyseerr).
 
 ## Acceptance criteria
 
 - [ ] Search returns results within 3 seconds under normal network conditions.
+- [ ] Search only fans out to plugins with a `requests.*` capability. Library plugins are not queried during search.
+- [ ] When one search plugin times out or fails, partial results from successful plugins are shown with a non-blocking notice identifying the unavailable plugin.
 - [ ] Results from multiple plugins are deduplicated by external ID.
 - [ ] Media type routing follows the configured policy for each request capability.
+- [ ] Ambiguous request routing is rejected at startup rather than resolved by plugin declaration order.
 - [ ] Items already in the library show "Available" without a request option.
 - [ ] A user cannot submit a duplicate request for an already-pending item.
-- [ ] Admins see a request management view with approve/deny actions (proxied to upstream plugin).
+- [ ] All users can see all pending and historical requests.
+- [ ] Admins are linked to the upstream service for approve/deny actions. Mortar does not implement a review UI.
 
 ## Plugin dependencies
 
@@ -63,8 +67,3 @@ Each result displays one of:
 | Shelfarr (optional) | `requests.ebook` |
 | Jellyfin | `library.exists` (for status badges and library links) |
 
-## Open questions
-
-- Should search also return results from the library (items already available) for discoverability?
-- How do we handle search when one plugin times out — show partial results or surface an error?
-- Should regular users see other users' pending requests, or only their own?

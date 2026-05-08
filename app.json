@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Mortar",
+    "slug": "mortar",
+    "version": "1.0.0",
+    "platforms": ["ios", "android", "web"],
+    "plugins": [
+      ["expo-router", { "root": "src/frontend" }]
+    ]
+  }
+}

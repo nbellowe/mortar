@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Status:** `blocked`
+- **Status:** `accepted`
 - **Depends on:** [Plugin Interface](../plugins/plugin-interface.md), [ADR 0004](../../docs/adrs/0004-plugin-response-caching.md), [ADR 0005](../../docs/adrs/0005-upstream-user-identity-linking.md)
 - **Last updated:** `2026-05-07`
 
@@ -15,50 +15,51 @@ Household members can browse what's already available in the library and launch 
 ### Browsing
 
 1. User opens the library view.
-2. Mortar fetches content from all plugins with `library.browse` capability (typically Jellyfin).
-3. Content is displayed in a grid: poster, title, year, type badge.
-4. Users can filter by: type (movies, shows, audiobooks), genre, and sort by (recently added, title, year).
-5. Pagination or infinite scroll handles large libraries.
+2. Mortar checks whether the user has the required external account link for the target library plugin.
+3. If the required link is missing, Mortar shows a clear message that browsing this library requires a linked account for that service.
+4. If the link exists, Mortar fetches content from all plugins with `library.browse` capability (typically Jellyfin).
+5. Content is displayed in a grid: poster, title, year, type badge.
+6. Users can filter by: type (movies, shows, audiobooks), genre, and sort by (recently added, title, year).
+7. Pagination or infinite scroll handles large libraries.
 
 ### Playing
 
 1. User clicks a library item.
-2. A detail view opens: full metadata, poster, overview, genres, cast (where available).
-3. A "Play" button generates a deep link via the plugin's `getPlayUrl()` and opens it.
-4. The client launches the deep link using the platform-appropriate handoff: browser tab on web, external app or browser on native platforms.
+2. If the required external account link for the target plugin is missing, Mortar shows a clear linked-account requirement instead of attempting handoff.
+3. If the link exists, Mortar immediately hands off to Jellyfin's web UI via the plugin's `getPlayUrl()`. The OS opens the URL in the default browser; Mortar never plays media inline.
 
-Mortar does not implement a video player. Playback is always delegated to the target player for the current platform.
+Mortar does not implement a detail view or a video/audio player. Clicking an item is a direct handoff — no intermediate screen.
 
-### Continue watching / recently added (home screen)
+**Session caveat:** Mortar can verify the user's `ExternalAccountLink` exists, but cannot guarantee an active Jellyfin browser session. If the user is not already logged in to Jellyfin, they will land on the Jellyfin login screen with no redirect back to the item. This is a known limitation for v1.
 
-The home screen surfaces two rows:
-- **Recently Added** — last 10 items added to the library
-- **Continue Watching** — items with in-progress playback (if the plugin supports `library.resume`)
+**Native app handoff:** No `jellyfin://` URL scheme is implemented in any current Jellyfin client (Swiftfin, jellyfin-android, jellyfin-androidtv). Handoff always opens the Jellyfin web UI in a browser, including on mobile. Native deep linking is out of scope for v1.
 
-Recently Added is sourced from `library.browse` with appropriate sort/filter options. Continue Watching is sourced from the optional `library.resume` capability.
+### Home entry points
+
+The home-screen behavior for Recently Added, Continue Watching, and the health badge is specified in [Home](home.md).
+
+When a user opens a library item from Home, Mortar MUST route to the same detail and playback handoff flows described in this spec.
 
 ## Acceptance criteria
 
+- [ ] When the required external account link is missing, the Browse & Play surface fails explicitly with clear UX rather than using a guest or shared fallback.
 - [ ] Library grid loads within 3 seconds for libraries up to 5,000 items.
 - [ ] Genre and type filters apply without a full page reload.
-- [ ] "Play" deep link opens the correct item in Jellyfin using the platform-appropriate handoff.
-- [ ] Recently Added row on home screen reflects last 10 additions.
-- [ ] Items marked as "Available" in search link through to the library detail view.
+- [ ] Clicking an item hands off immediately to the Jellyfin web UI via `getPlayUrl()`. No Mortar detail view is shown. Mortar does not play inline.
+- [ ] Items opened from Home use the same direct handoff flow as items opened from the library browse view.
+- [ ] Items marked as "Available" in search hand off directly to Jellyfin via `getPlayUrl()`.
 
 ## Plugin dependencies
 
 | Plugin type | Required capability |
 |---|---|
 | Jellyfin | `library.browse`, `library.exists` |
-| Jellyfin (optional) | `library.resume` |
 
 ## Out of scope (v1)
 
+- In-Mortar detail view (metadata, poster, cast). Jellyfin's own UI handles this.
 - In-Mortar video or audio playback.
+- Native app deep linking via `jellyfin://` or any other custom URL scheme.
 - Managing watchlists or favorites within Mortar.
 - Multiple library plugin sources (one Jellyfin instance is sufficient for v1).
 
-## Open questions
-
-- Should Mortar show Audiobookshelf content in the library browse view, or is that a separate section?
-- How do we handle users who are not registered in Jellyfin — can we generate a guest play link, or do they need a Jellyfin account?

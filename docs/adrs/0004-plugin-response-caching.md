@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -19,32 +19,36 @@ The current repo mentions caching as an open question but does not define scope,
 
 ## Decision
 
-Use an in-memory read-through cache with request coalescing for volatile upstream reads. Use SQLite only for durable snapshots and metadata, not as the primary cache for short-lived plugin responses.
+Use an in-memory read-through cache for volatile upstream reads. Use SQLite only for durable snapshots and Mortar-owned state, not as the primary cache for short-lived plugin responses.
 
 ## Policy
 
 - Cache only idempotent read operations.
 - Mutations must invalidate affected cached entries immediately.
-- Use request coalescing for identical in-flight requests.
-- Prefer stale-while-revalidate behavior for non-critical list views.
+- Do not use request coalescing in `v1`; simultaneous cache misses may fan out independently.
+- Do not use stale-while-revalidate behavior in `v1`; expired entries must be refreshed before responding.
+- Cache keys must include plugin identity, read operation, and normalized query parameters.
+- If a read result depends on effective user or role context, that context must be part of the cache key.
+- Cache behavior uses internal defaults in `v1`; no operator-facing cache tuning is required yet.
 
-## Recommended TTLs
+## TTL posture
 
-- Health: 60 seconds
-- Download queue: 5-10 seconds
-- Activity: 15-30 seconds
-- Library browse pages: 30-120 seconds
-- Search results: 30-60 seconds
-- Request detail / request lists: 15-30 seconds
+`v1` intentionally does not standardize exact TTL values yet. Freshness expectations still matter, but the repo is not locking concrete cache timings until implementation and feature rewrites make them easier to validate.
 
 ## Rationale
 
 - Memory caching matches the single-server deployment model and keeps implementation simple.
 - SQLite is a better fit for durable state than for a fast-changing hot cache.
-- Capability-specific TTLs avoid pretending that all plugin data has the same freshness requirements.
+- A simple cache model is easier to reason about than mixing coalescing, stale reads, and operator tuning before the first implementation exists.
 
 ## Consequences
 
 - Specs should call out freshness expectations where they matter.
-- The cache key design must include plugin id, capability, and query parameters.
+- The cache key design must include plugin id, read operation, query parameters, and user/role context where relevant.
 - Any admin mutation flow must invalidate related request and activity cache entries.
+- Activity, browse, download, health, and request views may rely on short-lived in-memory read caching, but not on durable cached responses in SQLite.
+
+## Related
+
+- [Plugin Response Caching Decision Session](../sessions/2026-05-07-plugin-response-caching.md)
+- [Architecture Spec](../../specs/architecture.md)
