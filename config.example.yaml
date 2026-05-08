@@ -1,0 +1,84 @@
+# Mortar configuration example
+#
+# Copy this file to config.yaml and edit it for your environment.
+# Secrets must never be written into this file directly. Use ${VAR} syntax
+# to reference environment variables — they are substituted at startup.
+#
+# Example:
+#   JELLYSEERR_API_KEY=my-secret go run ./cmd/server
+
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
+
+server:
+  # TCP port the Mortar HTTP server listens on.
+  # Default: 3000
+  port: 3000
+
+# ---------------------------------------------------------------------------
+# Plugins
+# ---------------------------------------------------------------------------
+#
+# Each entry declares one plugin instance. Multiple instances of the same
+# type are allowed (e.g. two Sonarr libraries).
+#
+# Fields:
+#   id      — unique identifier used in routing config and Mortar internal IDs.
+#             Use a short, descriptive name (no spaces).
+#   type    — plugin type. Must match a registered factory in the server.
+#   url     — base URL of the upstream service (no trailing slash).
+#   api_key — API key credential. Use ${VAR} to read from the environment.
+#   username / password — for services that use HTTP basic auth instead of
+#             an API key. Use ${VAR} for the password.
+
+plugins:
+  - id: jellyseerr
+    type: jellyseerr
+    url: http://jellyseerr:5055
+    api_key: ${JELLYSEERR_API_KEY}
+
+  - id: jellyfin
+    type: jellyfin
+    url: http://jellyfin:8096
+    api_key: ${JELLYFIN_API_KEY}
+
+  - id: sabnzbd
+    type: sabnzbd
+    url: http://sabnzbd:8080
+    api_key: ${SABNZBD_API_KEY}
+
+  - id: sonarr
+    type: sonarr
+    url: http://sonarr:8989
+    api_key: ${SONARR_API_KEY}
+
+  - id: radarr
+    type: radarr
+    url: http://radarr:7878
+    api_key: ${RADARR_API_KEY}
+
+  - id: audiobookrequest
+    type: audiobookrequest
+    url: http://audiobookrequest:8080
+    api_key: ${ABR_API_KEY}
+
+# ---------------------------------------------------------------------------
+# Request routing (ADR 0006)
+# ---------------------------------------------------------------------------
+#
+# Routing is only required when more than one plugin supports the same
+# capability. With a single candidate, Mortar auto-routes and no entry is
+# needed. Startup fails with a clear error if an ambiguity is unresolved.
+#
+# The example plugins above each cover a distinct capability (jellyseerr →
+# video, audiobookrequest → audio), so no routing block is required.
+#
+# Uncomment and fill in the block below only if you add a second plugin that
+# overlaps an existing capability:
+#
+# routing:
+#   requests:
+#     video: jellyseerr       # required if you had two video-request plugins
+#     audio: audiobookrequest # required if you had two audio-request plugins
+#     # ebook: my-ebook-plugin
