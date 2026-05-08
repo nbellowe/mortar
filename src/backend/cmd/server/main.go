@@ -14,6 +14,7 @@ import (
 	"github.com/nbellowe/mortar/src/backend/internal/config"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins/jellyfin"
+	"github.com/nbellowe/mortar/src/backend/internal/plugins/jellyseerr"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins/radarr"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins/sabnzbd"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins/sonarr"
@@ -39,8 +40,7 @@ func main() {
 	registry := plugins.NewRegistry()
 	// Plugin factories are registered here as plugin packages are added.
 	registry.RegisterFactory("jellyfin", jellyfin.New)
-	// Example (uncomment when implementing the jellyseerr plugin):
-	//   registry.RegisterFactory("jellyseerr", jellyseerr.NewPlugin)
+	registry.RegisterFactory("jellyseerr", jellyseerr.New)
 	registry.RegisterFactory("radarr", radarr.New)
 	registry.RegisterFactory("sabnzbd", sabnzbd.New)
 	registry.RegisterFactory("sonarr", sonarr.New)
