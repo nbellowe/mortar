@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "platforms": ["ios", "android", "web"],
     "plugins": [
-      ["expo-router", { "root": "src/frontend" }]
+      ["expo-router", { "root": "src/frontend/app" }]
     ]
   }
 }

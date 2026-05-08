@@ -106,8 +106,8 @@ export interface HealthStatus {
   latency_ms: number;
   /** ISO 8601 */
   checked_at: string;
-  /** Error message when not reachable */
-  detail?: string;
+  /** Error message when not reachable. Null when healthy (Go *string → JSON null). */
+  detail?: string | null;
 }
 
 export interface MortarUser {

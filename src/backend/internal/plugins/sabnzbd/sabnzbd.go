@@ -243,7 +243,7 @@ func parseMB(raw json.RawMessage) int64 {
 	return int64(mb * 1024 * 1024)
 }
 
-// parseKbps converts a kilobits-per-second raw value to bytes-per-second as int64.
+// parseKbps converts a kilobytes-per-second raw value to bytes-per-second as int64.
 func parseKbps(raw json.RawMessage) int64 {
 	kbps := parseFloat64Raw(raw)
 	return int64(kbps * 1024)

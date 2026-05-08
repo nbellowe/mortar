@@ -1,12 +1,10 @@
 /**
- * Search screen — Search & Request.
- *
- * Allows users to search for media across all plugins with a requests.* capability
- * and submit requests for items not yet in the library.
+ * Search & Request screen.
+ * Searches across request-capable plugins and lets users submit requests.
  * Spec: specs/features/requests.md
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,47 +15,37 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { searchMedia, submitRequest } from '../../api/requests';
 import { MediaItem } from '../../types/requests';
-
-// ---------------------------------------------------------------------------
-// Type badge
-// ---------------------------------------------------------------------------
+import { colors, radius, spacing, type } from '@/theme/tokens';
 
 const TYPE_LABEL: Record<MediaItem['type'], string> = {
-  movie: 'Movie',
-  show: 'TV Show',
-  audiobook: 'Audiobook',
-  ebook: 'Ebook',
+  movie: 'Movies',
+  show: 'Shows',
+  audiobook: 'Audiobooks',
+  ebook: 'Ebooks',
 };
 
-function TypeBadge({ type }: { type: MediaItem['type'] }) {
+function PosterPlaceholder() {
   return (
-    <View style={styles.typeBadge}>
-      <Text style={styles.typeBadgeText}>{TYPE_LABEL[type]}</Text>
+    <View style={s.posterPlaceholder}>
+      <Ionicons name="film-outline" size={24} color={colors.outline} />
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Poster
-// ---------------------------------------------------------------------------
-
 function Poster({ url }: { url?: string }) {
   if (url) {
-    return <Image source={{ uri: url }} style={styles.poster} resizeMode="cover" />;
+    return <Image source={{ uri: url }} style={s.poster} resizeMode="cover" />;
   }
-  return <View style={[styles.poster, styles.posterPlaceholder]} />;
+  return <PosterPlaceholder />;
 }
-
-// ---------------------------------------------------------------------------
-// Request button
-// ---------------------------------------------------------------------------
 
 interface RequestButtonProps {
   item: MediaItem;
-  onDone: (itemId: string, result: 'ok' | 'error', message: string) => void;
+  onDone: (id: string, result: 'ok' | 'error', msg: string) => void;
 }
 
 function RequestButton({ item, onDone }: RequestButtonProps) {
@@ -67,10 +55,9 @@ function RequestButton({ item, onDone }: RequestButtonProps) {
     setInFlight(true);
     try {
       await submitRequest(item);
-      onDone(item.id, 'ok', 'Requested!');
+      onDone(item.id, 'ok', 'Requested');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Request failed';
-      onDone(item.id, 'error', msg);
+      onDone(item.id, 'error', err instanceof Error ? err.message : 'Failed');
     } finally {
       setInFlight(false);
     }
@@ -78,53 +65,44 @@ function RequestButton({ item, onDone }: RequestButtonProps) {
 
   return (
     <TouchableOpacity
-      style={[styles.requestButton, inFlight && styles.requestButtonDisabled]}
+      style={[s.requestBtn, inFlight && s.requestBtnDisabled]}
       onPress={() => { void handlePress(); }}
       disabled={inFlight}
       accessibilityLabel={`Request ${item.title}`}
     >
       {inFlight ? (
-        <ActivityIndicator size="small" color="#fff" />
+        <ActivityIndicator size="small" color={colors.onPrimaryContainer} />
       ) : (
-        <Text style={styles.requestButtonText}>Request</Text>
+        <>
+          <Ionicons name="add-circle-outline" size={16} color={colors.onPrimaryContainer} />
+          <Text style={s.requestBtnText}>Request</Text>
+        </>
       )}
     </TouchableOpacity>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Media item row
-// ---------------------------------------------------------------------------
-
-interface MediaRowProps {
+interface MediaCardProps {
   item: MediaItem;
   feedback: { result: 'ok' | 'error'; message: string } | undefined;
-  onRequestDone: (itemId: string, result: 'ok' | 'error', message: string) => void;
+  onRequestDone: (id: string, result: 'ok' | 'error', msg: string) => void;
 }
 
-function MediaRow({ item, feedback, onRequestDone }: MediaRowProps) {
+function MediaCard({ item, feedback, onRequestDone }: MediaCardProps) {
   return (
-    <View style={styles.mediaRow}>
+    <View style={s.card}>
       <Poster url={item.poster_url} />
-      <View style={styles.mediaInfo}>
-        <Text style={styles.mediaTitle} numberOfLines={2}>{item.title}</Text>
-        <View style={styles.mediaSubRow}>
-          {item.year !== undefined ? (
-            <Text style={styles.mediaYear}>{item.year}</Text>
-          ) : null}
-          <TypeBadge type={item.type} />
-        </View>
-        {/* TODO: show Available/Requested state by checking library.exists + pending requests (spec §7-8). */}
-        {/* TODO: show detail/confirmation modal before submitting (spec §user-flow-5). */}
+      <View style={s.cardMeta}>
+        <Text style={s.cardYear}>{item.year ?? '—'}</Text>
+      </View>
+      <View style={s.cardBody}>
+        <Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
         {feedback ? (
-          <Text
-            style={[
-              styles.feedbackText,
-              feedback.result === 'ok' ? styles.feedbackOk : styles.feedbackError,
-            ]}
-          >
-            {feedback.message}
-          </Text>
+          <View style={[s.statusChip, feedback.result === 'ok' ? s.chipAvailable : s.chipError]}>
+            <Text style={[s.statusChipText, feedback.result === 'ok' ? s.chipTextAvailable : s.chipTextError]}>
+              {feedback.result === 'ok' ? 'Requested' : feedback.message}
+            </Text>
+          </View>
         ) : (
           <RequestButton item={item} onDone={onRequestDone} />
         )}
@@ -132,10 +110,6 @@ function MediaRow({ item, feedback, onRequestDone }: MediaRowProps) {
     </View>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Main screen
-// ---------------------------------------------------------------------------
 
 type FeedbackMap = Record<string, { result: 'ok' | 'error'; message: string }>;
 
@@ -174,227 +148,319 @@ export default function SearchScreen() {
   }, []);
 
   const handleRequestDone = useCallback(
-    (itemId: string, result: 'ok' | 'error', message: string) => {
-      setFeedback((prev) => ({ ...prev, [itemId]: { result, message } }));
+    (id: string, result: 'ok' | 'error', message: string) => {
+      setFeedback((prev) => ({ ...prev, [id]: { result, message } }));
     },
     [],
   );
 
+  const grouped = useMemo(() => {
+    const groups: { type: MediaItem['type']; label: string; items: MediaItem[] }[] = [];
+    const seen = new Map<MediaItem['type'], MediaItem[]>();
+    for (const item of results) {
+      if (!seen.has(item.type)) seen.set(item.type, []);
+      seen.get(item.type)!.push(item);
+    }
+    for (const [t, items] of seen) {
+      groups.push({ type: t, label: TYPE_LABEL[t], items });
+    }
+    return groups;
+  }, [results]);
+
   return (
-    <View style={styles.container}>
-      {/* Search bar */}
-      <View style={styles.searchBar}>
-        <TextInput
-          style={styles.searchInput}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search movies, shows, audiobooks…"
-          placeholderTextColor="#9ca3af"
-          returnKeyType="search"
-          onSubmitEditing={() => { void handleSearch(query); }}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+    <View style={s.container}>
+      <View style={s.topBar}>
+        <View style={s.searchBar}>
+          <Ionicons name="search-outline" size={18} color={colors.onSurfaceVariant} style={s.searchIcon} />
+          <TextInput
+            style={s.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search movies, shows, audiobooks…"
+            placeholderTextColor={colors.outline}
+            returnKeyType="search"
+            onSubmitEditing={() => { void handleSearch(query); }}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery('')} style={s.clearBtn}>
+              <Ionicons name="close-circle" size={18} color={colors.outline} />
+            </TouchableOpacity>
+          )}
+        </View>
         <TouchableOpacity
-          style={[styles.searchButton, !query.trim() && styles.searchButtonDisabled]}
+          style={[s.searchSubmit, !query.trim() && s.searchSubmitDisabled]}
           onPress={() => { void handleSearch(query); }}
           disabled={!query.trim() || loading}
         >
-          <Text style={styles.searchButtonText}>Search</Text>
+          <Text style={s.searchSubmitText}>Search</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Body */}
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" />
+        <View style={s.centered}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : error ? (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => { void handleSearch(query); }}
-          >
-            <Text style={styles.retryText}>Retry</Text>
+        <View style={s.centered}>
+          <View style={s.errorBanner}>
+            <Ionicons name="warning-outline" size={20} color={colors.error} />
+            <Text style={s.errorText}>{error}</Text>
+          </View>
+          <TouchableOpacity style={s.retryBtn} onPress={() => { void handleSearch(query); }}>
+            <Text style={s.retryBtnText}>Retry</Text>
           </TouchableOpacity>
         </View>
+      ) : !hasSearched ? (
+        <View style={s.centered}>
+          <Ionicons name="search" size={48} color={colors.outlineVariant} />
+          <Text style={s.emptyTitle}>Search your media stack</Text>
+          <Text style={s.emptyBody}>Find movies, shows, and audiobooks to request.</Text>
+        </View>
+      ) : grouped.length === 0 ? (
+        <View style={s.centered}>
+          <Text style={s.emptyTitle}>No results found</Text>
+          <Text style={s.emptyBody}>Try a different search term.</Text>
+        </View>
       ) : (
-        <>
-          {/* TODO: group results by media type: Movies, Shows, Audiobooks, Ebooks (spec §user-flow-4). */}
-          <FlatList
-            data={results}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <MediaRow
-                item={item}
-                feedback={feedback[item.id]}
-                onRequestDone={handleRequestDone}
-              />
-            )}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            ListEmptyComponent={
-              <View style={styles.centered}>
-                <Text style={styles.emptyText}>
-                  {hasSearched
-                    ? 'No results found.'
-                    : 'Search for movies and TV shows to request.'}
-                </Text>
+        <FlatList
+          data={grouped}
+          keyExtractor={(item) => item.type}
+          renderItem={({ item: group }) => (
+            <View style={s.group}>
+              <View style={s.groupHeader}>
+                <Text style={s.groupTitle}>{group.label}</Text>
+                <View style={s.groupCount}>
+                  <Text style={s.groupCountText}>{group.items.length}</Text>
+                </View>
               </View>
-            }
-          />
-        </>
+              <FlatList
+                data={group.items}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={s.cardRow}
+                renderItem={({ item }) => (
+                  <MediaCard
+                    item={item}
+                    feedback={feedback[item.id]}
+                    onRequestDone={handleRequestDone}
+                  />
+                )}
+              />
+            </View>
+          )}
+          contentContainerStyle={s.listContent}
+        />
       )}
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
+const POSTER_W = 120;
+const POSTER_H = 180;
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.background,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+    paddingHorizontal: spacing.gutter,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
   },
   searchBar: {
+    flex: 1,
     flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    gap: 8,
+    alignItems: 'center',
+    backgroundColor: colors.surfaceContainerHigh,
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.outlineVariant,
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 15,
-    color: '#111827',
-    backgroundColor: '#f9fafb',
+    fontSize: 16,
+    color: colors.onSurface,
   },
-  searchButton: {
+  clearBtn: {
+    padding: 4,
+  },
+  searchSubmit: {
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    height: 40,
-    backgroundColor: '#3b82f6',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: colors.primaryContainer,
+    borderRadius: radius.full,
   },
-  searchButtonDisabled: {
-    backgroundColor: '#93c5fd',
+  searchSubmitDisabled: {
+    opacity: 0.5,
   },
-  searchButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+  searchSubmitText: {
+    ...type.labelMd,
+    color: colors.onPrimaryContainer,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.gutter,
+    gap: spacing.sm,
   },
-  mediaRow: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    padding: 12,
-    gap: 12,
-  },
-  poster: {
-    width: 56,
-    height: 84,
-    borderRadius: 4,
-  },
-  posterPlaceholder: {
-    backgroundColor: '#d1d5db',
-  },
-  mediaInfo: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  mediaTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  mediaSubRow: {
+  errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  mediaYear: {
-    fontSize: 13,
-    color: '#6b7280',
-  },
-  typeBadge: {
-    backgroundColor: '#e5e7eb',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  typeBadgeText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  requestButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    backgroundColor: '#3b82f6',
-    borderRadius: 6,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  requestButtonDisabled: {
-    backgroundColor: '#93c5fd',
-  },
-  requestButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  feedbackText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  feedbackOk: {
-    color: '#16a34a',
-  },
-  feedbackError: {
-    color: '#dc2626',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#f3f4f6',
-  },
-  emptyText: {
-    fontSize: 15,
-    color: '#6b7280',
-    textAlign: 'center',
+    gap: spacing.base,
+    backgroundColor: colors.errorContainer,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
   },
   errorText: {
-    fontSize: 15,
-    color: '#ef4444',
-    textAlign: 'center',
-    marginBottom: 16,
+    ...type.bodyMd,
+    color: colors.onErrorContainer,
+    flex: 1,
   },
-  retryButton: {
-    paddingVertical: 8,
+  retryBtn: {
+    paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: '#3b82f6',
-    borderRadius: 6,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: radius.full,
   },
-  retryText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+  retryBtnText: {
+    ...type.labelMd,
+    color: colors.onPrimaryContainer,
+  },
+  emptyTitle: {
+    ...type.headlineMd,
+    color: colors.onSurface,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    ...type.bodyMd,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+  },
+  listContent: {
+    paddingVertical: spacing.gutter,
+    gap: 32,
+  },
+  group: {
+    gap: 16,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.gutter,
+  },
+  groupTitle: {
+    ...type.headlineLg,
+    color: colors.onSurface,
+  },
+  groupCount: {
+    backgroundColor: colors.surfaceContainerHigh,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+  },
+  groupCountText: {
+    ...type.labelSm,
+    color: colors.onSurfaceVariant,
+  },
+  cardRow: {
+    paddingHorizontal: spacing.gutter,
+    gap: spacing.md,
+  },
+  card: {
+    width: POSTER_W,
+    gap: 8,
+  },
+  poster: {
+    width: POSTER_W,
+    height: POSTER_H,
+    borderRadius: radius.lg,
+  },
+  posterPlaceholder: {
+    width: POSTER_W,
+    height: POSTER_H,
+    backgroundColor: colors.surfaceContainerHigh,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.outlineVariant,
+  },
+  cardMeta: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: `${colors.surface}dd`,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  cardYear: {
+    ...type.labelSm,
+    color: colors.onSurface,
+  },
+  cardBody: {
+    gap: 8,
+  },
+  cardTitle: {
+    ...type.labelMd,
+    color: colors.onSurface,
+  },
+  requestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: radius.md,
+  },
+  requestBtnDisabled: {
+    opacity: 0.6,
+  },
+  requestBtnText: {
+    ...type.labelMd,
+    color: colors.onPrimaryContainer,
+  },
+  statusChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  statusChipText: {
+    ...type.labelSm,
+  },
+  chipAvailable: {
+    backgroundColor: `${colors.tertiary}22`,
+    borderWidth: 1,
+    borderColor: `${colors.tertiary}44`,
+  },
+  chipTextAvailable: {
+    color: colors.tertiary,
+  },
+  chipError: {
+    backgroundColor: `${colors.error}22`,
+    borderWidth: 1,
+    borderColor: `${colors.error}44`,
+  },
+  chipTextError: {
+    color: colors.error,
   },
 });

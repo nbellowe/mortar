@@ -9,6 +9,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"github.com/nbellowe/mortar/src/backend/internal/config"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
 	"github.com/nbellowe/mortar/src/db"
 )
@@ -21,14 +23,25 @@ type handler struct {
 
 // NewRouter constructs and returns the root HTTP router.
 // Feature sub-routers are mounted here as they are implemented.
-func NewRouter(reg *plugins.Registry, database *db.DB) http.Handler {
+func NewRouter(cfg *config.Config, reg *plugins.Registry, database *db.DB) http.Handler {
 	h := &handler{registry: reg, database: database}
+
+	allowedOrigins := cfg.Server.AllowedOrigins
+	if len(allowedOrigins) == 0 {
+		allowedOrigins = []string{"*"}
+	}
 
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: allowedOrigins,
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Content-Type", "X-Request-Id"},
+		MaxAge:         300,
+	}))
 
 	r.Get("/health", h.handleHealth)
 

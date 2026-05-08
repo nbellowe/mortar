@@ -21,7 +21,8 @@ type Config struct {
 
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
-	Port int `yaml:"port"`
+	Port           int      `yaml:"port"`
+	AllowedOrigins []string `yaml:"allowed_origins,omitempty"`
 }
 
 // PluginConfig holds the configuration for a single plugin instance.
@@ -62,10 +63,19 @@ func Load(path string) (*Config, error) {
 
 	// Pre-process: replace ${VAR} in the raw YAML text before parsing so
 	// that the substituted values are parsed as their natural YAML types.
+	// Collect names of any referenced variables that are unset.
+	var missingVars []string
 	raw := envVarRE.ReplaceAllStringFunc(string(data), func(match string) string {
 		name := match[2 : len(match)-1]
-		return os.Getenv(name)
+		val := os.Getenv(name)
+		if val == "" {
+			missingVars = append(missingVars, name)
+		}
+		return val
 	})
+	if len(missingVars) > 0 {
+		return nil, fmt.Errorf("config: the following environment variables are referenced but not set: %s", strings.Join(missingVars, ", "))
+	}
 
 	var cfg Config
 	if err := yaml.Unmarshal([]byte(raw), &cfg); err != nil {

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 
 	"github.com/nbellowe/mortar/src/backend/internal/api"
+	"github.com/nbellowe/mortar/src/backend/internal/config"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
 )
 
@@ -120,7 +121,7 @@ func buildRegistry(ps map[string]plugins.Plugin, routes map[string]string) *plug
 // newTestServer creates an httptest.Server backed by the Mortar router.
 // The database is nil because none of the handler tests exercise DB calls.
 func newTestServer(reg *plugins.Registry) *httptest.Server {
-	router := api.NewRouter(reg, nil)
+	router := api.NewRouter(&config.Config{}, reg, nil)
 	return httptest.NewServer(router)
 }
 

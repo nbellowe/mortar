@@ -59,7 +59,10 @@ async function request<T>(
   const init: RequestInit = {
     method,
     headers,
-    credentials: 'include', // include HttpOnly session cookie
+    // Use 'same-origin' so credentials are sent only when on the same origin as
+    // the server (production). In development Expo runs on a different port, so
+    // no credentials are sent — acceptable while auth is not yet implemented.
+    credentials: 'same-origin',
     signal: options.signal,
   };
 
@@ -72,8 +75,8 @@ async function request<T>(
   if (!response.ok) {
     let message = response.statusText;
     try {
-      const err = (await response.json()) as { message?: string };
-      if (err.message) message = err.message;
+      const err = (await response.json()) as { error?: string };
+      if (err.error) message = err.error;
     } catch {
       // ignore parse errors; keep statusText as message
     }

@@ -20,8 +20,11 @@ func jsonError(w http.ResponseWriter, msg string, code int) {
 
 // submitRequestBody is the JSON body for POST /api/v1/requests.
 type submitRequestBody struct {
-	MediaID string `json:"media_id"`
-	Type    string `json:"type"`
+	MediaID string  `json:"media_id"`
+	Type    string  `json:"type"`
+	TmdbID  *string `json:"tmdb_id,omitempty"`
+	ImdbID  *string `json:"imdb_id,omitempty"`
+	TvdbID  *string `json:"tvdb_id,omitempty"`
 }
 
 // requesterPlugin retrieves the routed Requester plugin for requests.video.
@@ -127,6 +130,7 @@ func (h *handler) handleSubmitRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var body submitRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonError(w, "invalid request body", http.StatusBadRequest)
@@ -145,6 +149,9 @@ func (h *handler) handleSubmitRequest(w http.ResponseWriter, r *http.Request) {
 	item := plugins.MediaItem{
 		ExternalID: body.MediaID,
 		Type:       plugins.MediaType(body.Type),
+		TmdbID:     body.TmdbID,
+		ImdbID:     body.ImdbID,
+		TvdbID:     body.TvdbID,
 	}
 
 	// Stub requester — real auth is a later phase.
