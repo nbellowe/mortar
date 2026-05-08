@@ -11,5 +11,6 @@ This file tracks Mortar plugin support status and compatibility expectations.
 
 | Plugin type | Support level | Supported upstream versions | Capabilities | Notes |
 |---|---|---|---|---|
+| jellyseerr | Experimental | v1.x | requests.video, activity.read | Search and request movies/TV; view request activity |
 
 Add one row per plugin type as implementations land.
