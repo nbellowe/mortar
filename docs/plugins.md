@@ -11,5 +11,6 @@ This file tracks Mortar plugin support status and compatibility expectations.
 
 | Plugin type | Support level | Supported upstream versions | Capabilities | Notes |
 |---|---|---|---|---|
+| sabnzbd | Experimental | 3.x | downloads.read | NZB download queue |
 
 Add one row per plugin type as implementations land.
