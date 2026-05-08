@@ -42,7 +42,8 @@ Each result displays one of:
 
 - Users can view their own request history.
 - Admins can view all requests across all users.
-- Status updates are pulled from the upstream plugin (Jellyseerr, AudioBookRequest, etc.) on demand — Mortar does not own request state.
+- Mortar keeps durable local request snapshots for request history, duplicate-request checks, and faster views.
+- Upstream request plugins remain the source of truth for current request status and review actions.
 
 ## Acceptance criteria
 

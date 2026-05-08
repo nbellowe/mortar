@@ -81,7 +81,7 @@ These are unresolved decisions that must be made before implementation begins. D
 | Question | Status | Affects |
 |---|---|---|
 | Tech stack: Go backend + Expo (React Native) frontend | **RESOLVED** — see `specs/architecture.md` and `docs/sessions/2026-05-07-tech-stack.md` | — |
-| Persistence and state model | **PROPOSED** — see `docs/adrs/0002-persistence-and-state.md` | Auth, request history, health snapshots |
+| Persistence and state model | **RESOLVED** — see `docs/adrs/0002-persistence-and-state.md` and `docs/sessions/2026-05-07-persistence-state.md` | Auth, request history, health snapshots |
 | Real-time delivery model | **PROPOSED** — see `docs/adrs/0003-realtime-updates.md` | Activity feed, download queue, health freshness |
 | Plugin response caching | **PROPOSED** — see `docs/adrs/0004-plugin-response-caching.md` | All plugin reads |
 | Upstream user identity linking | **PROPOSED** — see `docs/adrs/0005-upstream-user-identity-linking.md` | Browse & play, continue watching, per-user activity |

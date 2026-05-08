@@ -15,9 +15,10 @@ The homelab owner can see at a glance whether all connected services are reachab
 ### Health dashboard
 
 1. Admin opens the health view.
-2. Mortar pings all configured plugins via their `health()` method.
+2. Mortar loads the last-known health snapshot for each configured plugin.
 3. Each plugin is shown as a card: name, type, URL, status indicator, latency, last checked timestamp.
 4. Overall stack health is summarized at the top: "All services healthy" or "X of Y services unreachable."
+5. Background health checks continue on the configured interval; page load does not block on a fresh live probe.
 
 ### Status indicators
 
@@ -49,6 +50,7 @@ All plugins must implement the base `health()` method. Health is mandatory and i
 
 - Alerting or notifications when a service goes down.
 - Historical uptime graphs.
+- Retaining long-term health history beyond the current last-known snapshot.
 - Auto-restart or remediation actions.
 
 ## Open questions

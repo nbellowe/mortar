@@ -14,7 +14,7 @@ This directory holds Mortar's cross-cutting technical decisions.
 | ID | Title | Status |
 |---|---|---|
 | [0001](0001-tech-stack.md) | Tech Stack | Accepted |
-| [0002](0002-persistence-and-state.md) | Persistence and State Model | Proposed |
+| [0002](0002-persistence-and-state.md) | Persistence and State Model | Accepted |
 | [0003](0003-realtime-updates.md) | Real-Time Update Delivery | Proposed |
 | [0004](0004-plugin-response-caching.md) | Plugin Response Caching | Proposed |
 | [0005](0005-upstream-user-identity-linking.md) | Upstream User Identity Linking | Proposed |

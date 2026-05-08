@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -23,17 +23,38 @@ The current specs say Mortar does not own request state, but they also require u
 
 ## Decision
 
-Use SQLite as Mortar's local persistent store for Mortar-owned state and durable snapshots. Mortar should not create a second source of truth for mutable media state that already belongs to upstream services.
+Use a single SQLite database as Mortar's `v1` durable store for Mortar-owned state and durable snapshots.
 
-## What will be stored
+Mortar should not create a second source of truth for mutable media state that already belongs to upstream services.
+
+## Durable core state
 
 - `users`
 - `sessions`
 - `external_account_links`
 - `health_snapshots`
 - `request_snapshots`
-- `activity_cursors`
-- `cache_metadata`
+
+## Snapshot behavior
+
+- `request_snapshots` are a durable history and convenience index retained indefinitely in `v1`
+- `request_snapshots` support request history, duplicate-request checks, and faster views
+- Upstream request systems remain authoritative for current request state and review actions
+- `health_snapshots` store only the last-known health record per plugin
+- `health_snapshots` are overwritten on each health check and back the cached health view
+
+## Auth behavior
+
+- Sessions are durable and server-side
+- The supported web client uses `HttpOnly` session cookies
+- Native-client auth is intentionally deferred until native clients become a supported surface
+
+## Transient or optional state
+
+- In-memory poll state
+- Short-lived cache entries
+- Cache metadata or polling cursors only when they materially improve correctness or startup continuity
+- If cache metadata or cursors need persistence, they should use the same SQLite file rather than a separate store
 
 ## What will not be stored as authoritative data
 
@@ -46,15 +67,17 @@ Use SQLite as Mortar's local persistent store for Mortar-owned state and durable
 
 - SQLite is sufficient for the single-server self-hosted deployment model.
 - It keeps setup simple for homelab users and avoids introducing a second service.
-- Durable local state solves the identity-linking and cached-health requirements without distorting the plugin model.
+- Durable local state solves the auth, identity-linking, request-history, and cached-health requirements without distorting the plugin model.
 
 ## Consequences
 
 - Mortar needs a migration system from day one.
-- Specs should distinguish between upstream source-of-truth data and Mortar snapshots.
+- Specs should distinguish between upstream source-of-truth data and Mortar snapshots or convenience indexes.
 - API responses that include cached or snapshot-backed data should expose freshness where relevant.
+- Web auth design can stay simple and server-centered for `v1`.
+- Restart continuity exists for durable auth and snapshot-backed views without persisting every internal optimization detail.
 
-## Open questions
+## Related
 
-- Should request snapshots be retained indefinitely or bounded by age?
-- Should cache metadata and health snapshots live in the same SQLite file or be split later if scale changes?
+- [Persistence and State Decision Session](../sessions/2026-05-07-persistence-state.md)
+- [Architecture Spec](../../specs/architecture.md)

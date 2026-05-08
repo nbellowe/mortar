@@ -82,9 +82,11 @@ Multiple plugins of the same type are allowed (e.g. two Sonarr instances).
 
 Two separate auth concerns:
 
-**Mortar user auth** — users log in to Mortar with a username/password (or SSO in a future version). Mortar maintains its own user table with roles: `admin` and `user`.
+**Mortar user auth** — users log in to Mortar with a username/password (or SSO in a future version). Mortar maintains its own user table with roles: `admin` and `user`, plus durable server-side sessions in local SQLite.
 
 **Service API keys** — stored in the Mortar server config, never exposed to the browser. The server proxies all service API calls. Users interact only with Mortar's API.
+
+For `v1`, the supported web client authenticates using an `HttpOnly` session cookie. Native-client auth is intentionally deferred until native clients become a supported surface.
 
 ## Request routing
 
@@ -107,6 +109,24 @@ Mortar normalizes all data from backend services into shared types:
 - `ActivityEvent` — source plugin, event type, item, timestamp, message
 - `DownloadItem` — name, progress, size, speed, eta, source plugin
 - `HealthStatus` — reachable, latency_ms, checked_at (Mortar adds plugin id when aggregating health across plugins)
+
+## Local persistence
+
+Mortar uses a single SQLite database for Mortar-owned state and durable snapshots.
+
+Durable local state includes:
+
+- `users`
+- `sessions`
+- `external_account_links`
+- `request_snapshots`
+- `health_snapshots`
+
+`request_snapshots` are a durable convenience index for request history and duplicate prevention, but upstream request systems remain authoritative.
+
+`health_snapshots` store last-known state only per plugin in `v1`; long-term health history is out of scope.
+
+Short-lived cache state, polling cursors, and similar optimization data should stay in memory unless persistence proves operationally necessary for correctness or startup continuity.
 
 ## Deployment
 
@@ -143,7 +163,6 @@ See `docs/adrs/0001-tech-stack.md` and `docs/sessions/2026-05-07-tech-stack.md` 
 
 ## Open questions
 
-- **Persistence and state model:** Which data is persisted locally versus proxied on demand? See ADR 0002.
 - **Real-time delivery:** Polling, SSE, or WebSocket for live download progress and activity? See ADR 0003.
 - **Plugin response caching:** How aggressively should Mortar cache upstream responses? See ADR 0004.
 - **Upstream user identity linking:** How does a Mortar user map to service-specific accounts for playback and per-user activity? See ADR 0005.
