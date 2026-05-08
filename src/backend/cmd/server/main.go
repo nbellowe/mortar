@@ -13,6 +13,7 @@ import (
 	"github.com/nbellowe/mortar/src/backend/internal/api"
 	"github.com/nbellowe/mortar/src/backend/internal/config"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
+	"github.com/nbellowe/mortar/src/backend/internal/plugins/radarr"
 	"github.com/nbellowe/mortar/src/db"
 )
 
@@ -36,6 +37,7 @@ func main() {
 	// Plugin factories are registered here as plugin packages are added.
 	// Example (uncomment when implementing the jellyseerr plugin):
 	//   registry.RegisterFactory("jellyseerr", jellyseerr.NewPlugin)
+	registry.RegisterFactory("radarr", radarr.New)
 
 	if err := registry.Init(cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "mortar: plugin registry init failed: %v\n", err)
