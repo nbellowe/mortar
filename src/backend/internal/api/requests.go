@@ -3,11 +3,20 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
 )
+
+// jsonError writes a JSON-encoded error response with the correct Content-Type.
+// http.Error always sets Content-Type: text/plain, so we use this helper instead.
+func jsonError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	fmt.Fprintf(w, `{"error":%q}`, msg)
+}
 
 // submitRequestBody is the JSON body for POST /api/v1/requests.
 type submitRequestBody struct {
@@ -21,19 +30,19 @@ type submitRequestBody struct {
 func (h *handler) requesterPlugin(w http.ResponseWriter) (plugins.Requester, bool) {
 	pluginID := h.registry.RouteRequest("requests.video")
 	if pluginID == "" {
-		http.Error(w, `{"error":"no requests.video plugin configured"}`, http.StatusServiceUnavailable)
+		jsonError(w, "no requests.video plugin configured", http.StatusServiceUnavailable)
 		return nil, false
 	}
 
 	p := h.registry.Get(pluginID)
 	if p == nil {
-		http.Error(w, `{"error":"requests.video plugin not found"}`, http.StatusServiceUnavailable)
+		jsonError(w, "requests.video plugin not found", http.StatusServiceUnavailable)
 		return nil, false
 	}
 
 	requester, ok := p.(plugins.Requester)
 	if !ok {
-		http.Error(w, `{"error":"requests.video plugin does not implement Requester"}`, http.StatusServiceUnavailable)
+		jsonError(w, "requests.video plugin does not implement Requester", http.StatusServiceUnavailable)
 		return nil, false
 	}
 
@@ -45,10 +54,11 @@ func (h *handler) requesterPlugin(w http.ResponseWriter) (plugins.Requester, boo
 // Calls Search on the routed requests.video plugin and returns a JSON array
 // of MediaItem.
 func (h *handler) handleSearch(w http.ResponseWriter, r *http.Request) {
+	// TODO: fan out to all plugins declaring any requests.* capability (spec §search).
+	// Currently routes only to the single requests.video plugin.
 	q := r.URL.Query().Get("q")
 	if q == "" {
-		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, `{"error":"missing required query parameter: q"}`, http.StatusBadRequest)
+		jsonError(w, "missing required query parameter: q", http.StatusBadRequest)
 		return
 	}
 
@@ -59,7 +69,7 @@ func (h *handler) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 	items, err := requester.Search(q)
 	if err != nil {
-		http.Error(w, `{"error":"search failed"}`, http.StatusInternalServerError)
+		jsonError(w, "search failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -93,7 +103,7 @@ func (h *handler) handleListRequests(w http.ResponseWriter, r *http.Request) {
 
 	requests, err := requester.ListRequests(opts)
 	if err != nil {
-		http.Error(w, `{"error":"list requests failed"}`, http.StatusInternalServerError)
+		jsonError(w, "list requests failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -119,16 +129,16 @@ func (h *handler) handleSubmitRequest(w http.ResponseWriter, r *http.Request) {
 
 	var body submitRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		jsonError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if body.MediaID == "" {
-		http.Error(w, `{"error":"media_id is required"}`, http.StatusBadRequest)
+		jsonError(w, "media_id is required", http.StatusBadRequest)
 		return
 	}
 	if body.Type == "" {
-		http.Error(w, `{"error":"type is required"}`, http.StatusBadRequest)
+		jsonError(w, "type is required", http.StatusBadRequest)
 		return
 	}
 
@@ -144,9 +154,10 @@ func (h *handler) handleSubmitRequest(w http.ResponseWriter, r *http.Request) {
 		Role:     "user",
 	}
 
+	// TODO: check request_snapshots for duplicate pending request (spec AC §8).
 	created, err := requester.SubmitRequest(item, user)
 	if err != nil {
-		http.Error(w, `{"error":"submit request failed"}`, http.StatusInternalServerError)
+		jsonError(w, "submit request failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -167,12 +178,12 @@ func (h *handler) handleGetRequest(w http.ResponseWriter, r *http.Request) {
 
 	req, err := requester.GetRequest(id)
 	if err != nil {
-		http.Error(w, `{"error":"get request failed"}`, http.StatusInternalServerError)
+		jsonError(w, "get request failed", http.StatusInternalServerError)
 		return
 	}
 
 	if req == nil {
-		http.Error(w, `{"error":"request not found"}`, http.StatusNotFound)
+		jsonError(w, "request not found", http.StatusNotFound)
 		return
 	}
 

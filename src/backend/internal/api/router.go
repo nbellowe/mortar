@@ -33,6 +33,7 @@ func NewRouter(reg *plugins.Registry, database *db.DB) http.Handler {
 	r.Get("/health", h.handleHealth)
 
 	// Feature routes.
+	// TODO: restrict to admin role once auth middleware is wired up (health spec AC).
 	r.Get("/api/v1/health", h.handlePluginHealth)
 	r.Get("/api/v1/search", h.handleSearch)
 	r.Get("/api/v1/requests", h.handleListRequests)

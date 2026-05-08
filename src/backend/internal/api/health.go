@@ -27,6 +27,9 @@ type pluginHealthResponse struct {
 // individual plugin failures are surfaced as "unreachable" entries in the
 // payload rather than as HTTP errors.
 func (h *handler) handlePluginHealth(w http.ResponseWriter, _ *http.Request) {
+	// TODO: serve last-known state from in-memory cache (ADR 0004) + background
+	// 60s polling goroutine (ADR 0003). Currently performs live probes on every
+	// request — acceptable for initial implementation only.
 	all := h.registry.All()
 
 	results := make([]pluginHealthResponse, 0, len(all))
