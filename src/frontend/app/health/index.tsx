@@ -15,113 +15,95 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { fetchHealth } from '../../api/health';
 import { PluginHealth } from '../../types/health';
-
-// ---------------------------------------------------------------------------
-// Status badge
-// ---------------------------------------------------------------------------
+import { colors, radius, spacing, type } from '@/theme/tokens';
 
 const STATUS_COLOR: Record<PluginHealth['status'], string> = {
-  healthy: '#22c55e',    // green
-  degraded: '#eab308',   // yellow
-  unreachable: '#ef4444', // red
-  unknown: '#9ca3af',    // grey
+  healthy: colors.statusHealthy,
+  degraded: colors.statusDegraded,
+  unreachable: colors.statusUnreachable,
+  unknown: colors.statusUnknown,
 };
 
-function StatusDot({ status }: { status: PluginHealth['status'] }) {
-  return <View style={[styles.dot, { backgroundColor: STATUS_COLOR[status] }]} />;
-}
+const STATUS_LABEL: Record<PluginHealth['status'], string> = {
+  healthy: 'Healthy',
+  degraded: 'Degraded',
+  unreachable: 'Unreachable',
+  unknown: 'Unknown',
+};
 
-// ---------------------------------------------------------------------------
-// Formatting helpers
-// ---------------------------------------------------------------------------
+const STATUS_ICON: Record<PluginHealth['status'], React.ComponentProps<typeof Ionicons>['name']> = {
+  healthy: 'checkmark-circle',
+  degraded: 'warning',
+  unreachable: 'close-circle',
+  unknown: 'help-circle',
+};
 
 function formatCheckedAt(iso: string): string {
   try {
-    const d = new Date(iso);
-    const diffMs = Date.now() - d.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
+    const diffSec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
     if (diffSec < 60) return `${diffSec}s ago`;
     const diffMin = Math.floor(diffSec / 60);
     if (diffMin < 60) return `${diffMin}m ago`;
-    const diffHr = Math.floor(diffMin / 60);
-    return `${diffHr}h ago`;
+    return `${Math.floor(diffMin / 60)}h ago`;
   } catch {
     return iso;
   }
 }
 
-function statusLabel(status: PluginHealth['status']): string {
-  switch (status) {
-    case 'healthy': return 'Healthy';
-    case 'degraded': return 'Degraded';
-    case 'unreachable': return 'Unreachable';
-    case 'unknown': return 'Unknown';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Summary banner
-// ---------------------------------------------------------------------------
-
 function SummaryBanner({ plugins }: { plugins: PluginHealth[] }) {
-  const unreachable = plugins.filter((p) => p.status === 'unreachable').length;
-  const total = plugins.length;
-
-  if (total === 0) return null;
-
-  const allHealthy = unreachable === 0 && plugins.every((p) => p.status !== 'unknown');
-
+  if (plugins.length === 0) return null;
+  const unhealthy = plugins.filter((p) => p.status !== 'healthy').length;
+  const allGood = unhealthy === 0;
   return (
-    <View style={[styles.banner, allHealthy ? styles.bannerGood : styles.bannerBad]}>
-      <Text style={styles.bannerText}>
-        {allHealthy
-          ? 'All services healthy'
-          : `${unreachable} of ${total} service${unreachable !== 1 ? 's' : ''} unreachable`}
+    <View style={[s.banner, allGood ? s.bannerGood : s.bannerBad]}>
+      <Ionicons
+        name={allGood ? 'checkmark-circle' : 'warning'}
+        size={18}
+        color={allGood ? colors.statusHealthy : colors.statusDegraded}
+      />
+      <Text style={s.bannerText}>
+        {allGood
+          ? `All ${plugins.length} services healthy`
+          : `${unhealthy} of ${plugins.length} service${unhealthy !== 1 ? 's' : ''} need attention`}
       </Text>
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Plugin row
-// ---------------------------------------------------------------------------
-
-function PluginRow({ plugin }: { plugin: PluginHealth }) {
+function PluginCard({ plugin }: { plugin: PluginHealth }) {
+  const statusColor = STATUS_COLOR[plugin.status];
   return (
-    <View style={styles.row}>
-      <View style={styles.rowLeft}>
-        <StatusDot status={plugin.status} />
-        <View style={styles.rowInfo}>
-          <Text style={styles.rowName}>{plugin.display_name}</Text>
-          <Text style={styles.rowMeta}>
-            {plugin.plugin_type} · {statusLabel(plugin.status)}
-          </Text>
+    <View style={s.card}>
+      <View style={s.cardLeft}>
+        <Ionicons name={STATUS_ICON[plugin.status]} size={22} color={statusColor} />
+        <View style={s.cardInfo}>
+          <Text style={s.cardName}>{plugin.display_name}</Text>
+          <Text style={s.cardMeta}>{plugin.plugin_type}</Text>
           {plugin.detail ? (
-            <Text style={styles.rowDetail} numberOfLines={2}>
-              {plugin.detail}
-            </Text>
+            <Text style={s.cardDetail} numberOfLines={2}>{plugin.detail}</Text>
           ) : null}
         </View>
       </View>
-      <View style={styles.rowRight}>
-        <Text style={styles.rowLatency}>{plugin.latency_ms} ms</Text>
-        <Text style={styles.rowChecked}>{formatCheckedAt(plugin.checked_at)}</Text>
+      <View style={s.cardRight}>
+        <View style={[s.statusPill, { borderColor: statusColor }]}>
+          <Text style={[s.statusPillText, { color: statusColor }]}>
+            {STATUS_LABEL[plugin.status]}
+          </Text>
+        </View>
+        <Text style={s.cardLatency}>{plugin.latency_ms} ms</Text>
+        <Text style={s.cardChecked}>{formatCheckedAt(plugin.checked_at)}</Text>
       </View>
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main screen
-// ---------------------------------------------------------------------------
-
 const REFRESH_INTERVAL_MS = 60_000;
 
 export default function HealthScreen() {
-  // TODO: restrict to admin role once auth is wired up (health spec: admins only).
   const [plugins, setPlugins] = useState<PluginHealth[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +113,6 @@ export default function HealthScreen() {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-
     try {
       const data = await fetchHealth(controller.signal);
       setPlugins(data);
@@ -144,164 +125,210 @@ export default function HealthScreen() {
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     void load();
-    return () => {
-      abortRef.current?.abort();
-    };
+    return () => { abortRef.current?.abort(); };
   }, [load]);
 
-  // Auto-refresh every 60 seconds
-  // TODO: extract into shared usePollingInterval hook (ADR 0003: centralise refresh policy).
   useEffect(() => {
-    const id = setInterval(() => {
-      void load();
-    }, REFRESH_INTERVAL_MS);
+    const id = setInterval(() => { void load(); }, REFRESH_INTERVAL_MS);
     return () => clearInterval(id);
   }, [load]);
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => { setLoading(true); void load(); }}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
-      <SummaryBanner plugins={plugins} />
-      <FlatList
-        data={plugins}
-        keyExtractor={(item) => item.plugin_id}
-        renderItem={({ item }) => <PluginRow plugin={item} />}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={
-          <View style={styles.centered}>
-            <Text style={styles.emptyText}>No plugins configured.</Text>
+    <View style={s.container}>
+      <View style={s.topBar}>
+        <Ionicons name="heart" size={22} color={colors.primaryFixedDim} />
+        <Text style={s.topBarTitle}>Service Health</Text>
+      </View>
+
+      {loading ? (
+        <View style={s.centered}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : error ? (
+        <View style={s.centered}>
+          <View style={s.errorBanner}>
+            <Ionicons name="warning-outline" size={20} color={colors.error} />
+            <Text style={s.errorText}>{error}</Text>
           </View>
-        }
-      />
+          <TouchableOpacity style={s.retryBtn} onPress={() => { setLoading(true); void load(); }}>
+            <Text style={s.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={plugins}
+          keyExtractor={(item) => item.plugin_id}
+          ListHeaderComponent={<SummaryBanner plugins={plugins} />}
+          renderItem={({ item }) => <PluginCard plugin={item} />}
+          ItemSeparatorComponent={() => <View style={s.separator} />}
+          contentContainerStyle={s.listContent}
+          ListEmptyComponent={
+            <View style={s.centered}>
+              <Ionicons name="server-outline" size={48} color={colors.outlineVariant} />
+              <Text style={s.emptyTitle}>No plugins configured</Text>
+              <Text style={s.emptyBody}>Add plugins in your Mortar config to see health status.</Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.background,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+    paddingHorizontal: spacing.gutter,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
+    backgroundColor: colors.surface,
+  },
+  topBarTitle: {
+    ...type.headlineLg,
+    color: colors.onSurface,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.gutter,
+    gap: spacing.sm,
   },
   banner: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+    paddingHorizontal: spacing.gutter,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.gutter,
+    marginTop: spacing.md,
+    borderRadius: radius.lg,
   },
   bannerGood: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: `${colors.statusHealthy}22`,
+    borderWidth: 1,
+    borderColor: `${colors.statusHealthy}44`,
   },
   bannerBad: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: `${colors.statusDegraded}22`,
+    borderWidth: 1,
+    borderColor: `${colors.statusDegraded}44`,
   },
   bannerText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
+    ...type.labelMd,
+    color: colors.onSurface,
+    flex: 1,
   },
-  row: {
+  listContent: {
+    paddingBottom: spacing.xl,
+    gap: spacing.base,
+    paddingTop: spacing.base,
+  },
+  card: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainer,
+    marginHorizontal: spacing.gutter,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.outlineVariant,
   },
-  rowLeft: {
+  cardLeft: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     flex: 1,
+    gap: spacing.sm,
   },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 3,
-    marginRight: 12,
-  },
-  rowInfo: {
+  cardInfo: {
     flex: 1,
   },
-  rowName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
+  cardName: {
+    ...type.labelMd,
+    color: colors.onSurface,
   },
-  rowMeta: {
-    fontSize: 13,
-    color: '#6b7280',
+  cardMeta: {
+    ...type.labelSm,
+    color: colors.onSurfaceVariant,
     marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  rowDetail: {
+  cardDetail: {
+    ...type.bodyMd,
     fontSize: 12,
-    color: '#ef4444',
+    color: colors.error,
     marginTop: 4,
   },
-  rowRight: {
+  cardRight: {
     alignItems: 'flex-end',
-    marginLeft: 12,
+    gap: 4,
+    marginLeft: spacing.sm,
   },
-  rowLatency: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+    borderWidth: 1,
   },
-  rowChecked: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginTop: 2,
+  statusPillText: {
+    ...type.labelSm,
+  },
+  cardLatency: {
+    ...type.labelSm,
+    color: colors.onSurfaceVariant,
+  },
+  cardChecked: {
+    fontSize: 11,
+    color: colors.outline,
+    lineHeight: 14,
+    fontWeight: '400',
   },
   separator: {
-    height: 1,
-    backgroundColor: '#f3f4f6',
+    height: 0,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+    backgroundColor: colors.errorContainer,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
   },
   errorText: {
-    fontSize: 15,
-    color: '#ef4444',
-    textAlign: 'center',
-    marginBottom: 16,
+    ...type.bodyMd,
+    color: colors.onErrorContainer,
+    flex: 1,
   },
-  retryButton: {
-    paddingVertical: 8,
+  retryBtn: {
+    paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: '#3b82f6',
-    borderRadius: 6,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: radius.full,
   },
-  retryText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+  retryBtnText: {
+    ...type.labelMd,
+    color: colors.onPrimaryContainer,
   },
-  emptyText: {
-    fontSize: 15,
-    color: '#6b7280',
+  emptyTitle: {
+    ...type.headlineMd,
+    color: colors.onSurface,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    ...type.bodyMd,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
   },
 });

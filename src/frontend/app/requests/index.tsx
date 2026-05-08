@@ -16,20 +16,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { fetchRequests } from '../../api/requests';
 import { Request, RequestStatus } from '../../types/requests';
-
-// ---------------------------------------------------------------------------
-// Status badge
-// ---------------------------------------------------------------------------
+import { colors, radius, spacing, type } from '@/theme/tokens';
 
 const STATUS_COLOR: Record<RequestStatus, string> = {
-  pending: '#eab308',
-  approved: '#3b82f6',
-  available: '#22c55e',
-  declined: '#ef4444',
-  failed: '#9ca3af',
+  pending: colors.statusDegraded,
+  approved: colors.tertiary,
+  available: colors.statusHealthy,
+  declined: colors.statusUnreachable,
+  failed: colors.statusUnknown,
 };
 
 const STATUS_LABEL: Record<RequestStatus, string> = {
@@ -40,49 +38,50 @@ const STATUS_LABEL: Record<RequestStatus, string> = {
   failed: 'Failed',
 };
 
+const STATUS_ICON: Record<RequestStatus, React.ComponentProps<typeof Ionicons>['name']> = {
+  pending: 'time-outline',
+  approved: 'checkmark-circle-outline',
+  available: 'checkmark-circle',
+  declined: 'close-circle-outline',
+  failed: 'alert-circle-outline',
+};
+
 function StatusBadge({ status }: { status: RequestStatus }) {
+  const color = STATUS_COLOR[status];
   return (
-    <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[status] }]}>
-      <Text style={styles.statusBadgeText}>{STATUS_LABEL[status]}</Text>
+    <View style={[s.statusBadge, { borderColor: color }]}>
+      <Ionicons name={STATUS_ICON[status]} size={13} color={color} />
+      <Text style={[s.statusBadgeText, { color }]}>{STATUS_LABEL[status]}</Text>
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Formatting
-// ---------------------------------------------------------------------------
-
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+      year: 'numeric', month: 'short', day: 'numeric',
     });
   } catch {
     return iso;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Request row
-// ---------------------------------------------------------------------------
-
 function RequestRow({ request }: { request: Request }) {
   return (
-    <View style={styles.row}>
-      <View style={styles.rowMain}>
-        <Text style={styles.rowTitle} numberOfLines={2}>{request.item.title}</Text>
-        <Text style={styles.rowDate}>Submitted {formatDate(request.submitted_at)}</Text>
+    <View style={s.row}>
+      <View style={s.rowLeft}>
+        <View style={s.rowIcon}>
+          <Ionicons name="film-outline" size={20} color={colors.onSurfaceVariant} />
+        </View>
+        <View style={s.rowInfo}>
+          <Text style={s.rowTitle} numberOfLines={2}>{request.item.title}</Text>
+          <Text style={s.rowDate}>Submitted {formatDate(request.submitted_at)}</Text>
+        </View>
       </View>
       <StatusBadge status={request.status} />
     </View>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Main screen
-// ---------------------------------------------------------------------------
 
 const REFRESH_INTERVAL_MS = 30_000;
 
@@ -96,9 +95,7 @@ export default function RequestsScreen() {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-
     try {
-      // TODO: filter by authenticated user ID once auth is implemented.
       const data = await fetchRequests({ signal: controller.signal });
       setRequests(data);
       setError(null);
@@ -110,133 +107,172 @@ export default function RequestsScreen() {
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     void load();
-    return () => {
-      abortRef.current?.abort();
-    };
+    return () => { abortRef.current?.abort(); };
   }, [load]);
 
-  // Auto-refresh every 30 seconds
-  // TODO: extract into shared usePollingInterval hook (ADR 0003: centralise refresh policy).
+  // TODO: extract into shared usePollingInterval hook (ADR 0003)
   useEffect(() => {
-    const id = setInterval(() => {
-      void load();
-    }, REFRESH_INTERVAL_MS);
+    const id = setInterval(() => { void load(); }, REFRESH_INTERVAL_MS);
     return () => clearInterval(id);
   }, [load]);
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => { setLoading(true); void load(); }}
-        >
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={requests}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <RequestRow request={item} />}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={
-          <View style={styles.centered}>
-            <Text style={styles.emptyText}>No requests yet.</Text>
+    <View style={s.container}>
+      <View style={s.topBar}>
+        <Ionicons name="receipt-outline" size={22} color={colors.primaryFixedDim} />
+        <Text style={s.topBarTitle}>My Requests</Text>
+      </View>
+
+      {loading ? (
+        <View style={s.centered}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : error ? (
+        <View style={s.centered}>
+          <View style={s.errorBanner}>
+            <Ionicons name="warning-outline" size={20} color={colors.error} />
+            <Text style={s.errorText}>{error}</Text>
           </View>
-        }
-      />
+          <TouchableOpacity style={s.retryBtn} onPress={() => { setLoading(true); void load(); }}>
+            <Text style={s.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={requests}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <RequestRow request={item} />}
+          ItemSeparatorComponent={() => <View style={s.separator} />}
+          contentContainerStyle={s.listContent}
+          ListEmptyComponent={
+            <View style={s.centered}>
+              <Ionicons name="receipt-outline" size={48} color={colors.outlineVariant} />
+              <Text style={s.emptyTitle}>No requests yet</Text>
+              <Text style={s.emptyBody}>Search for movies, shows, and audiobooks to request them.</Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.background,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+    paddingHorizontal: spacing.gutter,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
+    backgroundColor: colors.surface,
+  },
+  topBarTitle: {
+    ...type.headlineLg,
+    color: colors.onSurface,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.gutter,
+    gap: spacing.sm,
+  },
+  listContent: {
+    paddingVertical: spacing.base,
+    paddingBottom: spacing.xl,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.gutter,
+    gap: spacing.sm,
   },
-  rowMain: {
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: spacing.sm,
+  },
+  rowIcon: {
+    width: 40,
+    height: 40,
+    backgroundColor: colors.surfaceContainerHigh,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowInfo: {
     flex: 1,
   },
   rowTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
+    ...type.labelMd,
+    color: colors.onSurface,
+    marginBottom: 2,
   },
   rowDate: {
-    fontSize: 13,
-    color: '#6b7280',
+    ...type.labelSm,
+    color: colors.onSurfaceVariant,
+    fontWeight: '400',
   },
   statusBadge: {
-    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: radius.full,
+    borderWidth: 1,
   },
   statusBadgeText: {
-    fontSize: 12,
-    color: '#fff',
-    fontWeight: '600',
+    ...type.labelSm,
   },
   separator: {
-    height: 1,
-    backgroundColor: '#f3f4f6',
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.outlineVariant,
+    marginHorizontal: spacing.gutter,
   },
-  emptyText: {
-    fontSize: 15,
-    color: '#6b7280',
-    textAlign: 'center',
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+    backgroundColor: colors.errorContainer,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
   },
   errorText: {
-    fontSize: 15,
-    color: '#ef4444',
-    textAlign: 'center',
-    marginBottom: 16,
+    ...type.bodyMd,
+    color: colors.onErrorContainer,
+    flex: 1,
   },
-  retryButton: {
-    paddingVertical: 8,
+  retryBtn: {
+    paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: '#3b82f6',
-    borderRadius: 6,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: radius.full,
   },
-  retryText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+  retryBtnText: {
+    ...type.labelMd,
+    color: colors.onPrimaryContainer,
+  },
+  emptyTitle: {
+    ...type.headlineMd,
+    color: colors.onSurface,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    ...type.bodyMd,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
   },
 });
