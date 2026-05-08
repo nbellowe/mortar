@@ -13,7 +13,7 @@ import { MediaItem, Request } from '../types/requests';
  */
 export async function searchMedia(query: string, signal?: AbortSignal): Promise<MediaItem[]> {
   const encoded = encodeURIComponent(query);
-  return api.get<MediaItem[]>(`/api/search?q=${encoded}`, { signal });
+  return api.get<MediaItem[]>(`/api/v1/search?q=${encoded}`, { signal });
 }
 
 /**
@@ -28,7 +28,7 @@ export async function fetchRequests(options?: {
   if (options?.requesterId) params.set('requester_id', options.requesterId);
   if (options?.status) params.set('status', options.status);
   const qs = params.toString();
-  return api.get<Request[]>(`/api/requests${qs ? `?${qs}` : ''}`, { signal: options?.signal });
+  return api.get<Request[]>(`/api/v1/requests${qs ? `?${qs}` : ''}`, { signal: options?.signal });
 }
 
 /**
@@ -36,12 +36,18 @@ export async function fetchRequests(options?: {
  * Uses hardcoded requester "anonymous" until auth is implemented.
  */
 export async function submitRequest(item: MediaItem, signal?: AbortSignal): Promise<Request> {
-  return api.post<Request>('/api/requests', { item_id: item.id, requester_id: 'anonymous' }, { signal });
+  return api.post<Request>('/api/v1/requests', {
+    media_id: item.external_id,
+    type: item.type,
+    tmdb_id: item.tmdb_id,
+    imdb_id: item.imdb_id,
+    tvdb_id: item.tvdb_id,
+  }, { signal });
 }
 
 /**
  * Fetch a single request by its Mortar-internal ID.
  */
 export async function fetchRequest(id: string, signal?: AbortSignal): Promise<Request> {
-  return api.get<Request>(`/api/requests/${encodeURIComponent(id)}`, { signal });
+  return api.get<Request>(`/api/v1/requests/${encodeURIComponent(id)}`, { signal });
 }

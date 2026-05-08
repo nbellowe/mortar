@@ -59,7 +59,10 @@ async function request<T>(
   const init: RequestInit = {
     method,
     headers,
-    credentials: 'include', // include HttpOnly session cookie
+    // Use 'same-origin' so credentials are sent only when on the same origin as
+    // the server (production). In development Expo runs on a different port, so
+    // no credentials are sent — acceptable while auth is not yet implemented.
+    credentials: 'same-origin',
     signal: options.signal,
   };
 

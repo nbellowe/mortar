@@ -118,7 +118,8 @@ func (p *Plugin) Health() (plugins.HealthStatus, error) {
 // Search fans the query to the Jellyseerr search endpoint and returns
 // normalized MediaItems.
 func (p *Plugin) Search(query string) ([]plugins.MediaItem, error) {
-	endpoint := fmt.Sprintf("/api/v1/search?query=%s&page=1", url.QueryEscape(query))
+	// Jellyseerr requires %20 for spaces, not the + that url.QueryEscape produces.
+	endpoint := fmt.Sprintf("/api/v1/search?query=%s&page=1", strings.ReplaceAll(url.QueryEscape(query), "+", "%20"))
 	resp, err := p.get(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("jellyseerr: search request failed: %w", err)
@@ -443,12 +444,11 @@ func (p *Plugin) mapSearchResult(r jsSearchResult) plugins.MediaItem {
 		item.PosterURL = &posterURL
 	}
 
-	// TmdbID is the TMDB ID from the search result (distinct from r.ID which is
-	// Jellyseerr's internal ID used for ExternalID and Mortar ID).
-	if r.TmdbID != 0 {
-		tmdbIDStr := strconv.Itoa(r.TmdbID)
-		item.TmdbID = &tmdbIDStr
-	}
+	// In Jellyseerr search results the "id" field is the TMDB ID. There is no
+	// separate "tmdbId" field in the search response — set TmdbID from r.ID so
+	// that SubmitRequest can forward it to Jellyseerr's request API.
+	tmdbIDStr := strconv.Itoa(r.ID)
+	item.TmdbID = &tmdbIDStr
 
 	if r.ImdbID != "" {
 		imdb := r.ImdbID
@@ -456,6 +456,43 @@ func (p *Plugin) mapSearchResult(r jsSearchResult) plugins.MediaItem {
 	}
 
 	return item
+}
+
+// fetchMediaTitle looks up the title for a media item from Jellyseerr's
+// movie or TV detail endpoint. Returns an empty string if the lookup fails
+// so callers can fall back gracefully.
+func (p *Plugin) fetchMediaTitle(tmdbID int, mediaType string) string {
+	if tmdbID == 0 {
+		return ""
+	}
+	var path string
+	if mediaType == "movie" {
+		path = fmt.Sprintf("/api/v1/movie/%d", tmdbID)
+	} else {
+		path = fmt.Sprintf("/api/v1/tv/%d", tmdbID)
+	}
+
+	resp, err := p.get(path)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	var detail struct {
+		Title string `json:"title"` // movies
+		Name  string `json:"name"`  // TV shows
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		return ""
+	}
+	if detail.Title != "" {
+		return detail.Title
+	}
+	return detail.Name
 }
 
 // mapMediaFromRequest converts a jsMedia embedded in a request to a
@@ -471,12 +508,17 @@ func (p *Plugin) mapMediaFromRequest(m jsMedia) plugins.MediaItem {
 		mediaType = plugins.MediaTypeShow
 	}
 
+	title := m.Title
+	if title == "" && m.TmdbID != 0 {
+		title = p.fetchMediaTitle(m.TmdbID, m.MediaType)
+	}
+
 	item := plugins.MediaItem{
 		ID:         mortarID,
 		ExternalID: externalID,
 		PluginID:   p.id,
 		Type:       mediaType,
-		Title:      m.Title,
+		Title:      title,
 	}
 
 	if m.TmdbID != 0 {

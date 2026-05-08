@@ -11,5 +11,5 @@ import { PluginHealth } from '../types/health';
  * Returns the last-known health snapshot for all configured plugins.
  */
 export async function fetchHealth(signal?: AbortSignal): Promise<PluginHealth[]> {
-  return api.get<PluginHealth[]>('/api/health', { signal });
+  return api.get<PluginHealth[]>('/api/v1/health', { signal });
 }

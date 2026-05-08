@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
 	"github.com/nbellowe/mortar/src/db"
 )
@@ -29,6 +30,12 @@ func NewRouter(reg *plugins.Registry, database *db.DB) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Content-Type", "X-Request-Id"},
+		MaxAge:         300,
+	}))
 
 	r.Get("/health", h.handleHealth)
 

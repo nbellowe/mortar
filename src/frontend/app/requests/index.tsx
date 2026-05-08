@@ -85,8 +85,6 @@ function RequestRow({ request }: { request: Request }) {
 // ---------------------------------------------------------------------------
 
 const REFRESH_INTERVAL_MS = 30_000;
-// TODO: replace with authenticated user ID once auth is implemented.
-const REQUESTER_ID = 'anonymous';
 
 export default function RequestsScreen() {
   const [requests, setRequests] = useState<Request[]>([]);
@@ -100,10 +98,8 @@ export default function RequestsScreen() {
     abortRef.current = controller;
 
     try {
-      const data = await fetchRequests({
-        requesterId: REQUESTER_ID,
-        signal: controller.signal,
-      });
+      // TODO: filter by authenticated user ID once auth is implemented.
+      const data = await fetchRequests({ signal: controller.signal });
       setRequests(data);
       setError(null);
     } catch (err) {
