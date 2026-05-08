@@ -11,5 +11,6 @@ This file tracks Mortar plugin support status and compatibility expectations.
 
 | Plugin type | Support level | Supported upstream versions | Capabilities | Notes |
 |---|---|---|---|---|
+| jellyfin | Experimental | 10.8+ | library.browse, library.exists, library.resume | Browse library, check availability, continue watching |
 
 Add one row per plugin type as implementations land.
