@@ -193,3 +193,15 @@ func (r *Registry) All() map[string]Plugin {
 func (r *Registry) RouteRequest(capability string) string {
 	return r.requestRoutes[capability]
 }
+
+// InjectForTest populates a Registry directly from a map of pre-built plugin
+// instances and an optional request route map, bypassing Init and factory
+// resolution. This is intended for use in unit tests only.
+func (r *Registry) InjectForTest(ps map[string]Plugin, routes map[string]string) {
+	for id, p := range ps {
+		r.plugins[id] = p
+	}
+	for cap, id := range routes {
+		r.requestRoutes[cap] = id
+	}
+}
