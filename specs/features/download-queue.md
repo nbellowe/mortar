@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Status:** `blocked`
+- **Status:** `accepted`
 - **Depends on:** [Plugin Interface](../plugins/plugin-interface.md), [ADR 0003](../../docs/adrs/0003-realtime-updates.md), [ADR 0004](../../docs/adrs/0004-plugin-response-caching.md)
 - **Last updated:** `2026-05-07`
 
@@ -18,6 +18,7 @@ A unified view of everything currently downloading, across all download clients.
 2. Mortar fetches the current queue from all plugins with `downloads.read` capability.
 3. Items are merged into a single list, sorted by: actively downloading first, then queued, then paused/failed.
 4. Each item shows: name, progress bar, size, download speed, ETA, status, and source plugin badge.
+5. While the view is active, Mortar refreshes the queue on the shared 10-second polling interval.
 
 ### Status indicators
 
@@ -56,7 +57,3 @@ Admins see the full view.
 - Pause, resume, or cancel downloads from Mortar. Link to native app instead.
 - Per-download logs or error details.
 
-## Open questions
-
-- Should regular users see the download queue at all, or only admins?
-- Is 10-second polling acceptable, or should this use a WebSocket/SSE for real-time updates?

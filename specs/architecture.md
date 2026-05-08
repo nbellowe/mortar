@@ -68,7 +68,6 @@ plugins:
     type: sonarr
     url: http://sonarr:8989
     api_key: ${SONARR_API_KEY}
-    capabilities: [activity.read]  # override: use sonarr only for activity
 
   - id: audiobookrequest
     type: audiobookrequest
@@ -98,7 +97,18 @@ audio request   → configured `requests.audio` route
 ebook request   → configured `requests.ebook` route
 ```
 
-The simplest proposed default is "first declared plugin wins," but the final policy remains open until ADR 0006 is accepted.
+Routing lives in a top-level `routing` section rather than inside plugin definitions:
+
+```yaml
+routing:
+  requests:
+    video: jellyseerr
+    audio: audiobookrequest
+```
+
+`v1` routing is only by request capability. If exactly one plugin exposes a given request capability, Mortar may route to it automatically. If more than one plugin exposes the same request capability, explicit routing config is required and startup validation must fail if the ambiguity is unresolved.
+
+If no plugin exposes a request capability, that request type is simply unavailable in the product.
 
 ## Data model
 
@@ -108,7 +118,7 @@ Mortar normalizes all data from backend services into shared types:
 - `Request` — item, requester, status, submitted_at, fulfilled_at
 - `ActivityEvent` — source plugin, event type, item, timestamp, message
 - `DownloadItem` — name, progress, size, speed, eta, source plugin
-- `HealthStatus` — reachable, latency_ms, checked_at (Mortar adds plugin id when aggregating health across plugins)
+- `HealthStatus` — status, reachable, latency_ms, checked_at, detail? (Mortar adds plugin id when aggregating health across plugins; status is derived by Mortar from reachable + latency_ms thresholds — see plugin interface)
 
 ## Local persistence
 
@@ -127,6 +137,41 @@ Durable local state includes:
 `health_snapshots` store last-known state only per plugin in `v1`; long-term health history is out of scope.
 
 Short-lived cache state, polling cursors, and similar optimization data should stay in memory unless persistence proves operationally necessary for correctness or startup continuity.
+
+## Upstream identity linking
+
+Mortar owns authentication and roles, but some plugin features require user-specific upstream context.
+
+- External account links are explicit per-user, per-plugin records stored in Mortar's local database
+- They are optional overall and are only required for features that need personalized upstream behavior
+- In `v1`, link management starts with config-file or bootstrap seeding rather than a dedicated admin UI
+- Mortar does not auto-provision guest, shadow, or fallback upstream accounts in `v1`
+
+For `v1`, Browse & Play is link-gated for the relevant plugin. If a required external account link is missing, Mortar should fail explicitly with clear UX rather than silently browsing or playing through a shared fallback.
+
+## Read caching
+
+Mortar uses an in-memory read-through cache for volatile upstream reads in `v1`.
+
+- Only idempotent read operations are cacheable
+- SQLite is not the hot cache for short-lived plugin responses
+- Upstream mutations triggered by Mortar must invalidate affected cached reads immediately
+- Cache keys must include plugin identity, read operation, normalized parameters, and user or role context when the result is scoped
+- Expired cache entries are refreshed before responding; `v1` does not use stale-while-revalidate behavior
+
+Exact TTL values are intentionally left open for now, but feature specs should still be honest about freshness expectations and latency goals.
+
+## Refresh model
+
+Mortar uses polling for `v1` freshness-sensitive UI updates behind a shared frontend subscription abstraction.
+
+- Downloads poll every 10 seconds by default
+- Activity polls every 30 seconds by default
+- Health uses a 60-second default freshness interval
+- Incremental fetches should be used where they fit naturally, especially for activity-style feeds
+- Inactive or backgrounded views should throttle or suspend polling rather than continue at full rate
+
+SSE and WebSockets remain possible later, but they are intentionally deferred until polling proves insufficient.
 
 ## Deployment
 
@@ -161,9 +206,3 @@ A Kubernetes manifest and Helm chart are planned for the server deployment.
 
 See `docs/adrs/0001-tech-stack.md` and `docs/sessions/2026-05-07-tech-stack.md` for the full rationale including alternatives considered.
 
-## Open questions
-
-- **Real-time delivery:** Polling, SSE, or WebSocket for live download progress and activity? See ADR 0003.
-- **Plugin response caching:** How aggressively should Mortar cache upstream responses? See ADR 0004.
-- **Upstream user identity linking:** How does a Mortar user map to service-specific accounts for playback and per-user activity? See ADR 0005.
-- **Request routing policy:** How should Mortar choose among multiple plugins that share the same request capability? See ADR 0006.

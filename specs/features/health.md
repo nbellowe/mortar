@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Status:** `blocked`
+- **Status:** `accepted`
 - **Depends on:** [Plugin Interface](../plugins/plugin-interface.md), [ADR 0002](../../docs/adrs/0002-persistence-and-state.md), [ADR 0003](../../docs/adrs/0003-realtime-updates.md), [ADR 0004](../../docs/adrs/0004-plugin-response-caching.md)
 - **Last updated:** `2026-05-07`
 
@@ -18,7 +18,7 @@ The homelab owner can see at a glance whether all connected services are reachab
 2. Mortar loads the last-known health snapshot for each configured plugin.
 3. Each plugin is shown as a card: name, type, URL, status indicator, latency, last checked timestamp.
 4. Overall stack health is summarized at the top: "All services healthy" or "X of Y services unreachable."
-5. Background health checks continue on the configured interval; page load does not block on a fresh live probe.
+5. Background health checks continue on the shared 60-second cadence; page load does not block on a fresh live probe.
 
 ### Status indicators
 
@@ -29,13 +29,13 @@ The homelab owner can see at a glance whether all connected services are reachab
 | Unreachable | Connection failed or timed out |
 | Unknown | Not yet checked since startup |
 
-### Home screen badge
+### Home screen badge source
 
-The home screen navigation shows a badge if any service is currently unreachable. Clicking it goes to the health view. Regular users see the badge but cannot access the health detail view.
+The home-screen badge behavior is specified in [Home](home.md). This feature owns the last-known health state that Home consumes.
 
 ## Acceptance criteria
 
-- [ ] All plugins are checked on a configurable interval (default: 60 seconds).
+- [ ] All plugins are checked on the shared 60-second cadence.
 - [ ] Health check results are cached — the health view shows last-known state, not a live probe on page load.
 - [ ] Latency is displayed in ms.
 - [ ] Unreachable services are visually prominent (red indicator, not just a text label).
@@ -52,8 +52,3 @@ All plugins must implement the base `health()` method. Health is mandatory and i
 - Historical uptime graphs.
 - Retaining long-term health history beyond the current last-known snapshot.
 - Auto-restart or remediation actions.
-
-## Open questions
-
-- Should the health check interval be configurable per-plugin or globally?
-- Should non-admin users see any health information at all, or just the badge?
