@@ -39,10 +39,15 @@ Mortar owns exactly five flows:
 
 Everything else is a link to the native app.
 
+## Client scope (v1)
+
+- Mortar `v1.0` officially supports the server and the web client.
+- Native clients for iOS, Android, macOS, and Windows may exist during `v0.x`, but they are experimental and not release-blocking for `v1.0`.
+
 ## Non-goals (v1)
 
 - User-facing notifications / push alerts
 - Playback within Mortar (deep link to Jellyfin instead)
 - Admin configuration UI (config file is sufficient for v1)
-- Mobile app (responsive web is good enough)
+- Stable native client support across iOS, Android, macOS, and Windows
 - Multi-server / multi-instance support

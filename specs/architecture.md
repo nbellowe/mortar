@@ -5,7 +5,8 @@
 Mortar has three layers:
 
 ```
-Web / iOS / Android / macOS / Windows clients (Expo)
+Supported `v1.0` client: Web (Expo web)
+Experimental `v0.x` clients: iOS / Android / macOS / Windows (Expo)
   └── Mortar Server (HTTP API + plugin runtime)
         ├── Plugin: Jellyseerr
         ├── Plugin: Jellyfin
@@ -17,6 +18,9 @@ Web / iOS / Android / macOS / Windows clients (Expo)
 ```
 
 The server holds API keys, proxies requests to backend services, normalizes responses, and exposes the Mortar API consumed by every client. Web and native clients never talk directly to backend services.
+
+Web is the only supported client target for `v1.0`. Native and desktop clients remain experimental until a later milestone.
+The plugin list above illustrates the broader plugin model; the narrower `v1.0` reference stack is defined in [`ROADMAP.md`](../ROADMAP.md).
 
 ## Plugin model
 
@@ -118,8 +122,8 @@ docker run \
 
 Frontend delivery is split by platform:
 
-- Web: Expo web bundle pointed at the Mortar server URL
-- iOS / Android / desktop: native app builds pointed at the Mortar server URL
+- Web: supported `v1.0` client path via the Expo web target
+- iOS / Android / desktop: experimental during `v0.x`; not required for `v1.0` release readiness
 
 A Kubernetes manifest and Helm chart are planned for the server deployment.
 
@@ -127,7 +131,7 @@ A Kubernetes manifest and Helm chart are planned for the server deployment.
 
 **Backend: Go.** The Mortar server is a long-running API proxy with a plugin system making concurrent upstream calls. Go's goroutines, interface model, and single-binary compilation make it the right fit. The plugin interface is a Go interface; each plugin is a Go package under `internal/plugins/`.
 
-**Frontend: Expo (React Native, TypeScript).** Expo is the only framework that reaches all target platforms from one codebase and distributes through native app stores. Platform-specific UI code is allowed via `.ios.tsx` / `.android.tsx` / `.web.tsx` file conventions; business logic is always shared.
+**Frontend: Expo (React Native, TypeScript).** Expo is the long-term client strategy because it reaches all target platforms from one codebase and can expand into native app stores later. Mortar's `v1.0` support promise is still web-first. Platform-specific UI code is allowed via `.ios.tsx` / `.android.tsx` / `.web.tsx` file conventions; business logic is always shared.
 
 ## Design workflow
 

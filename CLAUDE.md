@@ -93,6 +93,10 @@ These are unresolved decisions that must be made before implementation begins. D
 
 **Frontend: Expo (React Native, TypeScript)** — `app/` (Expo Router file-based routes), `src/api/` (shared API client), `src/components/` (shared components), `src/types/` (shared TypeScript types)
 
+### Release posture
+
+`v1.0` officially supports the Mortar server and the web client. Native clients may exist during `v0.x` as experimental work, but they are not release-blocking for `v1.0`.
+
 ### Running locally
 
 ```bash
@@ -118,7 +122,10 @@ npx expo start --android
 # Backend — single binary
 go build -o mortar ./cmd/server
 
-# Frontend — native app builds via EAS (Expo Application Services)
+# Frontend — supported `v1.0` web target
+npx expo export --platform web
+
+# Frontend — experimental native app builds via EAS (Expo Application Services)
 eas build --platform ios
 eas build --platform android
 eas build --platform all
@@ -143,16 +150,16 @@ npx jest
 
 ### Platform targets
 
-| Platform | v1 | How |
+| Platform | Status | How |
 |---|---|---|
-| Web browser | ✓ | Expo web target (React Native Web) |
-| iOS | ✓ | Native via Expo — App Store |
-| Android | ✓ | Native via Expo — Google Play |
-| macOS | ✓ | react-native-macos — Mac App Store |
-| Windows | ✓ | react-native-windows — Microsoft Store |
-| Apple TV | post-v1 | react-native-tvos |
-| Android TV / Fire TV | post-v1 | react-native-tvos |
-| Samsung Tizen / LG webOS | post-v1 | react-native-tvos (community) |
+| Web browser | Supported for `v1.0` | Expo web target (React Native Web) |
+| iOS | Experimental during `v0.x` | Native via Expo — App Store |
+| Android | Experimental during `v0.x` | Native via Expo — Google Play |
+| macOS | Experimental during `v0.x` | react-native-macos — Mac App Store |
+| Windows | Experimental during `v0.x` | react-native-windows — Microsoft Store |
+| Apple TV | Planned post-v1 | react-native-tvos |
+| Android TV / Fire TV | Planned post-v1 | react-native-tvos |
+| Samsung Tizen / LG webOS | Planned post-v1 | react-native-tvos (community) |
 
 Roku is explicitly out of scope — it requires BrightScript and cannot be reached from any shared codebase.
 

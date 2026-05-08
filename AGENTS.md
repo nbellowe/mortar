@@ -129,19 +129,23 @@ Validates that a feature or plugin meets its acceptance criteria. Writes tests; 
 
 ## doc-writer
 
-Writes user-facing and operator-facing documentation for the public docs site.
+Writes documentation for Mortar's three documentation audiences: app users, operators, and contributors.
 
 **Read first:** The relevant feature spec in `specs/features/`
 
 **Workflow:**
-1. Identify the primary audience for this feature: household user (non-technical, wants to request and watch things) or homelab owner (configures plugins, manages the stack).
-2. Write documentation to `docs/site/<section>/`:
-   - **Household docs** — plain language, task-oriented. Example: "How to request a movie." Step-by-step, no jargon, no configuration details.
-   - **Operator docs** — technical, config-focused. Example: "Configuring the Jellyseerr plugin." Covers YAML fields, environment variables, capability flags.
-3. Include: what the feature does, how to use it, and any configuration the operator must provide.
+1. Identify which of the three audiences are affected:
+   - **App users** — non-technical people who request, browse, and watch things
+   - **Operators** — the person who configures and runs Mortar
+   - **Contributors** — people changing Mortar itself
+2. Write docs in the right home:
+   - **App user docs** — `docs/site/users/`, plain language and task-oriented. Example: "How to request a movie."
+   - **Operator docs** — `docs/site/operators/`, technical and config-focused. Example: "Configuring the Jellyseerr plugin."
+   - **Contributor docs** — repo-root files like `CONTRIBUTING.md`, `SECURITY.md`, or `CODE_OF_CONDUCT.md` when the change affects project workflow or contribution policy.
+3. Include what the feature does, how to use it, and any configuration the operator must provide.
 4. Do not reproduce spec language verbatim — translate it into how-to content. The spec describes *what*; the docs describe *how*.
 
-**Output:** Markdown files under `docs/site/`.
+**Output:** Markdown files under `docs/site/` or repo-root contributor docs, depending on the audience.
 
 **Hard constraints:** No implementation code. Document only what currently exists — not planned or proposed features. If the feature is incomplete, do not document it.
 
