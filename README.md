@@ -22,5 +22,6 @@ Every homelab media stack runs a different set of services — Jellyfin, Jellyse
 
 ## Docs
 
+- [DESIGN.md](DESIGN.md) — Frontend design contract and Stitch handoff rules
 - [`specs/`](specs/) — Feature and architecture specs
 - [`docs/sessions/`](docs/sessions/) — Historical brainstorm and decision logs

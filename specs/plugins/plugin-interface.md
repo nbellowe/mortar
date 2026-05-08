@@ -4,6 +4,8 @@
 
 A plugin is a module that wraps a single backend service. It declares its capabilities and implements the methods that correspond to them. Mortar only calls methods that the plugin has declared support for.
 
+The canonical implementation is Go. The TypeScript-style interfaces below remain the source-of-truth contract notation for specs, backend implementations, and mirrored frontend types.
+
 ## Capability declaration
 
 ```typescript
@@ -20,9 +22,9 @@ type Capability =
   | "requests.ebook"
   | "library.browse"
   | "library.exists"
+  | "library.resume"
   | "downloads.read"
-  | "activity.read"
-  | "health.ping";
+  | "activity.read";
 ```
 
 ## Base interface
@@ -34,15 +36,7 @@ interface Plugin {
   manifest: PluginManifest;
   health(): Promise<HealthStatus>;
 }
-```
 
-## Capability interfaces
-
-Plugins implement only the interfaces matching their declared capabilities.
-
-### `health.ping`
-
-```typescript
 interface HealthStatus {
   reachable: boolean;
   latency_ms: number;
@@ -51,14 +45,27 @@ interface HealthStatus {
 }
 ```
 
+Health is a mandatory base contract, not a capability flag.
+
+## Capability interfaces
+
+Plugins implement only the interfaces matching their declared capabilities.
+
 ### `requests.video` / `requests.audio` / `requests.ebook`
 
 ```typescript
 interface RequestCapable {
-  search(query: string, type: MediaType): Promise<MediaItem[]>;
+  search(query: string): Promise<MediaItem[]>;
   getRequest(id: string): Promise<Request | null>;
-  listRequests(options?: { userId?: string; status?: RequestStatus }): Promise<Request[]>;
+  listRequests(options?: { requesterId?: string; status?: RequestStatus }): Promise<Request[]>;
   submitRequest(item: MediaItem, requester: MortarUser): Promise<Request>;
+  reviewRequest(id: string, review: RequestReview): Promise<Request>;
+}
+
+interface RequestReview {
+  decision: "approve" | "decline";
+  reviewer: MortarUser;
+  reason?: string;
 }
 ```
 
@@ -84,7 +91,32 @@ interface BrowseOptions {
 
 ```typescript
 interface LibraryExists {
-  exists(item: MediaItem): Promise<boolean>;
+  findMatch(item: MediaItem): Promise<LibraryMatch | null>;
+}
+
+interface LibraryMatch {
+  plugin_id: string;
+  item: MediaItem;
+  matched_by: "tmdb_id" | "imdb_id" | "tvdb_id" | "isbn" | "asin" | "title_year";
+}
+```
+
+### `library.resume`
+
+```typescript
+interface LibraryResumeReadable {
+  getContinueWatching(
+    user: MortarUser,
+    options?: { limit?: number }
+  ): Promise<ContinueWatchingItem[]>;
+}
+
+interface ContinueWatchingItem {
+  item: MediaItem;
+  progress: number;           // 0.0-1.0
+  position_seconds?: number;
+  duration_seconds?: number;
+  last_watched_at: string;    // ISO 8601
 }
 ```
 
@@ -121,6 +153,9 @@ interface ActivityEvent {
   item?: MediaItem;
   message: string;
   timestamp: string; // ISO 8601
+  visibility: ActivityVisibility;
+  actor_user_id?: string;
+  actor_display_name?: string;
 }
 
 type ActivityEventType =
@@ -128,9 +163,11 @@ type ActivityEventType =
   | "added_to_library"
   | "requested"
   | "approved"
-  | "rejected"
+  | "declined"
   | "failed"
   | "deleted";
+
+type ActivityVisibility = "all_users" | "admin_only" | "requester_and_admin";
 ```
 
 ## Shared types
@@ -172,6 +209,13 @@ interface MortarUser {
   id: string;
   username: string;
   role: "admin" | "user";
+  external_accounts?: ExternalAccountLink[];
+}
+
+interface ExternalAccountLink {
+  plugin_id: string;
+  external_user_id: string;
+  external_username?: string;
 }
 
 interface PagedResult<T> {
@@ -181,6 +225,10 @@ interface PagedResult<T> {
   page_size: number;
 }
 ```
+
+## Failure semantics
+
+Plugin methods should reject on upstream auth errors, unreachability, or timeouts. Mortar's plugin runtime is responsible for capturing failures per plugin so multi-plugin views can return partial data with notices about unavailable sources.
 
 ## Plugin registration
 
@@ -196,7 +244,7 @@ Unknown plugin types are a startup error.
 
 ## Adding a new plugin
 
-1. Create a file in `src/plugins/<type>.ts`
+1. Create a package in `internal/plugins/<type>/`
 2. Implement `Plugin` and any capability interfaces
 3. Declare the type in the plugin registry
 4. Add a row to the plugin compatibility table in `docs/plugins.md`

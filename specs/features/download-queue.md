@@ -1,5 +1,11 @@
 # Feature: Download Queue
 
+## Metadata
+
+- **Status:** `blocked`
+- **Depends on:** [Plugin Interface](../plugins/plugin-interface.md), [ADR 0003](../../docs/adrs/0003-realtime-updates.md), [ADR 0004](../../docs/adrs/0004-plugin-response-caching.md)
+- **Last updated:** `2026-05-07`
+
 ## Goal
 
 A unified view of everything currently downloading, across all download clients. The homelab owner (and optionally regular users) can see queue status and progress at a glance.

@@ -1,5 +1,11 @@
 # Feature: Search & Request
 
+## Metadata
+
+- **Status:** `blocked`
+- **Depends on:** [Plugin Interface](../plugins/plugin-interface.md), [ADR 0002](../../docs/adrs/0002-persistence-and-state.md), [ADR 0004](../../docs/adrs/0004-plugin-response-caching.md), [ADR 0006](../../docs/adrs/0006-request-routing-policy.md)
+- **Last updated:** `2026-05-07`
+
 ## Goal
 
 A household user can find any media — movie, show, audiobook, ebook — and request it, without knowing which underlying service handles each type.
@@ -20,7 +26,7 @@ Each result displays one of:
 
 | Badge | Meaning |
 |---|---|
-| Available | Item exists in the library (`library.exists` check passed) |
+| Available | A matching library item was returned by `library.exists` |
 | Requested | A pending request exists for this item |
 | Request | Item is not available and not requested |
 
@@ -29,7 +35,7 @@ Each result displays one of:
 1. User clicks a result marked "Request".
 2. A detail modal opens with: poster, title, overview, genres, year.
 3. User confirms the request.
-4. Mortar routes the request to the correct plugin based on media type.
+4. Mortar routes the request to the correct plugin based on media type and the configured routing policy.
 5. Modal updates to show "Requested" with current status.
 
 ### Request status tracking
@@ -42,7 +48,7 @@ Each result displays one of:
 
 - [ ] Search returns results within 3 seconds under normal network conditions.
 - [ ] Results from multiple plugins are deduplicated by external ID.
-- [ ] Media type routing is correct: video → first `requests.video` plugin, audio → first `requests.audio` plugin, ebook → first `requests.ebook` plugin.
+- [ ] Media type routing follows the configured policy for each request capability.
 - [ ] Items already in the library show "Available" without a request option.
 - [ ] A user cannot submit a duplicate request for an already-pending item.
 - [ ] Admins see a request management view with approve/deny actions (proxied to upstream plugin).
@@ -54,7 +60,7 @@ Each result displays one of:
 | Jellyseerr | `requests.video` |
 | AudioBookRequest | `requests.audio` |
 | Shelfarr (optional) | `requests.ebook` |
-| Jellyfin | `library.exists` (for status badges) |
+| Jellyfin | `library.exists` (for status badges and library links) |
 
 ## Open questions
 

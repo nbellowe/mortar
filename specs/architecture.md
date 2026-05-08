@@ -5,19 +5,18 @@
 Mortar has three layers:
 
 ```
-Browser
-  └── Mortar UI (web app)
-        └── Mortar Server (API + plugin runtime)
-              ├── Plugin: Jellyseerr
-              ├── Plugin: Jellyfin
-              ├── Plugin: SABnzbd
-              ├── Plugin: qBittorrent
-              ├── Plugin: Sonarr
-              ├── Plugin: Radarr
-              └── Plugin: AudioBookRequest
+Web / iOS / Android / macOS / Windows clients (Expo)
+  └── Mortar Server (HTTP API + plugin runtime)
+        ├── Plugin: Jellyseerr
+        ├── Plugin: Jellyfin
+        ├── Plugin: SABnzbd
+        ├── Plugin: qBittorrent
+        ├── Plugin: Sonarr
+        ├── Plugin: Radarr
+        └── Plugin: AudioBookRequest
 ```
 
-The server holds API keys, proxies requests to backend services, normalizes responses, and serves the UI. The browser never talks directly to backend services.
+The server holds API keys, proxies requests to backend services, normalizes responses, and exposes the Mortar API consumed by every client. Web and native clients never talk directly to backend services.
 
 ## Plugin model
 
@@ -33,10 +32,12 @@ See [`plugins/plugin-interface.md`](plugins/plugin-interface.md) for the full in
 | `requests.audio` | Can accept and track audiobook requests |
 | `requests.ebook` | Can accept and track ebook requests |
 | `library.browse` | Can enumerate library content |
-| `library.exists` | Can answer "does this item exist in the library?" |
+| `library.exists` | Can resolve whether a media item already exists in the library |
+| `library.resume` | Can return user-specific in-progress playback items |
 | `downloads.read` | Can report current download queue and progress |
 | `activity.read` | Can report a stream of recent events |
-| `health.ping` | Can report connectivity status |
+
+Health is not a capability flag. Every plugin implements the base `health()` contract.
 
 ### Plugin configuration
 
@@ -83,15 +84,15 @@ Two separate auth concerns:
 
 ## Request routing
 
-When a user submits a request, Mortar routes it to the appropriate plugin based on content type:
+When a user submits a request, Mortar routes it to the appropriate plugin based on content type and the configured routing policy for that capability:
 
 ```
-video request   → first plugin with requests.video capability
-audio request   → first plugin with requests.audio capability
-ebook request   → first plugin with requests.ebook capability
+video request   → configured `requests.video` route
+audio request   → configured `requests.audio` route
+ebook request   → configured `requests.ebook` route
 ```
 
-In configs where multiple plugins share a capability (unlikely but possible), the first declared plugin wins. A future version may allow explicit routing rules.
+The simplest proposed default is "first declared plugin wins," but the final policy remains open until ADR 0006 is accepted.
 
 ## Data model
 
@@ -101,11 +102,11 @@ Mortar normalizes all data from backend services into shared types:
 - `Request` — item, requester, status, submitted_at, fulfilled_at
 - `ActivityEvent` — source plugin, event type, item, timestamp, message
 - `DownloadItem` — name, progress, size, speed, eta, source plugin
-- `HealthStatus` — plugin id, reachable, latency_ms, checked_at
+- `HealthStatus` — reachable, latency_ms, checked_at (Mortar adds plugin id when aggregating health across plugins)
 
 ## Deployment
 
-Mortar is distributed as a single Docker image. Configuration is provided via a mounted config file and environment variables for secrets.
+The Mortar server is distributed as a single Docker image. Configuration is provided via a mounted config file and environment variables for secrets.
 
 ```
 docker run \
@@ -115,11 +116,31 @@ docker run \
   mortar:latest
 ```
 
-A Kubernetes manifest and Helm chart are planned.
+Frontend delivery is split by platform:
+
+- Web: Expo web bundle pointed at the Mortar server URL
+- iOS / Android / desktop: native app builds pointed at the Mortar server URL
+
+A Kubernetes manifest and Helm chart are planned for the server deployment.
+
+## Tech stack
+
+**Backend: Go.** The Mortar server is a long-running API proxy with a plugin system making concurrent upstream calls. Go's goroutines, interface model, and single-binary compilation make it the right fit. The plugin interface is a Go interface; each plugin is a Go package under `internal/plugins/`.
+
+**Frontend: Expo (React Native, TypeScript).** Expo is the only framework that reaches all target platforms from one codebase and distributes through native app stores. Platform-specific UI code is allowed via `.ios.tsx` / `.android.tsx` / `.web.tsx` file conventions; business logic is always shared.
+
+## Design workflow
+
+**Design tool: Google Stitch.** Stitch is the preferred tool for frontend ideation, screen exploration, flow prototyping, and visual iteration.
+
+**Source of truth: repo-owned design contract.** Stitch is not the implementation authority by itself. The canonical design-system source of truth lives in the repository as versioned design rules, implementation tokens, and component conventions. See [`DESIGN.md`](../DESIGN.md).
+
+See `docs/adrs/0001-tech-stack.md` and `docs/sessions/2026-05-07-tech-stack.md` for the full rationale including alternatives considered.
 
 ## Open questions
 
-- **Tech stack:** TypeScript (Next.js full-stack) vs. Go backend + React frontend. Decision pending.
-- **Database:** Does Mortar need persistent storage? Possibly for user accounts and request history cache. SQLite is sufficient.
-- **Real-time updates:** WebSocket or SSE for live download progress and activity feed?
-- **Caching:** How aggressively should plugin responses be cached to avoid hammering upstream services?
+- **Persistence and state model:** Which data is persisted locally versus proxied on demand? See ADR 0002.
+- **Real-time delivery:** Polling, SSE, or WebSocket for live download progress and activity? See ADR 0003.
+- **Plugin response caching:** How aggressively should Mortar cache upstream responses? See ADR 0004.
+- **Upstream user identity linking:** How does a Mortar user map to service-specific accounts for playback and per-user activity? See ADR 0005.
+- **Request routing policy:** How should Mortar choose among multiple plugins that share the same request capability? See ADR 0006.

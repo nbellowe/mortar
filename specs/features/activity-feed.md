@@ -1,5 +1,11 @@
 # Feature: Activity Feed
 
+## Metadata
+
+- **Status:** `blocked`
+- **Depends on:** [Plugin Interface](../plugins/plugin-interface.md), [ADR 0002](../../docs/adrs/0002-persistence-and-state.md), [ADR 0003](../../docs/adrs/0003-realtime-updates.md), [ADR 0004](../../docs/adrs/0004-plugin-response-caching.md), [ADR 0005](../../docs/adrs/0005-upstream-user-identity-linking.md)
+- **Last updated:** `2026-05-07`
+
 ## Goal
 
 A single chronological feed showing what has happened across the entire media stack — downloads completed, items added to the library, requests made and fulfilled. Household members can see what's new without checking each service individually.
@@ -21,6 +27,7 @@ A single chronological feed showing what has happened across the entire media st
 | Download completed | SABnzbd, qBittorrent | All users |
 | Request submitted | Jellyseerr, AudioBookRequest | Admin + requester |
 | Request approved | Jellyseerr, AudioBookRequest | Admin + requester |
+| Request declined | Jellyseerr, AudioBookRequest | Admin + requester |
 | Request failed | Jellyseerr, AudioBookRequest | Admin + requester |
 | Item deleted | Sonarr, Radarr, Lidarr | Admin only |
 

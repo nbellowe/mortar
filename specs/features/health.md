@@ -1,5 +1,11 @@
 # Feature: Service Health
 
+## Metadata
+
+- **Status:** `blocked`
+- **Depends on:** [Plugin Interface](../plugins/plugin-interface.md), [ADR 0002](../../docs/adrs/0002-persistence-and-state.md), [ADR 0003](../../docs/adrs/0003-realtime-updates.md), [ADR 0004](../../docs/adrs/0004-plugin-response-caching.md)
+- **Last updated:** `2026-05-07`
+
 ## Goal
 
 The homelab owner can see at a glance whether all connected services are reachable, without opening each app individually.
@@ -37,7 +43,7 @@ The home screen navigation shows a badge if any service is currently unreachable
 
 ## Plugin dependencies
 
-All plugins must implement `health.ping`. It is the only mandatory capability.
+All plugins must implement the base `health()` method. Health is mandatory and is not a capability flag.
 
 ## Out of scope (v1)
 

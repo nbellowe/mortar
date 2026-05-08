@@ -23,6 +23,9 @@ This directory is the source of truth for what Mortar builds. All features begin
 
 ## Conventions
 
+- Each spec should begin with a short metadata block: **Status** and **Depends on** for ADRs or other blocking specs. **Last updated** is optional if it helps you track iteration.
 - Each spec has an **Acceptance criteria** section. These are the definition of done.
 - **Open questions** sections track decisions not yet made. Resolve them before implementing.
 - Specs are written in terms of user behavior, not implementation. Keep the how out of specs.
+- Cross-cutting technical decisions belong in `docs/adrs/`. Feature and architecture specs should reference ADR ids instead of restating the same decision logic in multiple places.
+- When a requirement is intended to be normative, prefer explicit language such as `MUST`, `SHOULD`, and `MAY`.
