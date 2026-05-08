@@ -50,7 +50,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	router := api.NewRouter(registry, database)
+	router := api.NewRouter(cfg, registry, database)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	fmt.Printf("mortar: listening on %s\n", addr)

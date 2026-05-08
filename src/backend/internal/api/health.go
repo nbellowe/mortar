@@ -4,6 +4,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
+	"time"
 
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
 )
@@ -39,6 +41,10 @@ func (h *handler) handlePluginHealth(w http.ResponseWriter, _ *http.Request) {
 		results = append(results, entry)
 	}
 
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].PluginID < results[j].PluginID
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(results)
@@ -48,6 +54,7 @@ func (h *handler) handlePluginHealth(w http.ResponseWriter, _ *http.Request) {
 // entry. If Health() returns an error, the entry is synthesized as
 // "unreachable" with the error message in Detail.
 func buildHealthEntry(manifest plugins.PluginManifest, p plugins.Plugin) pluginHealthResponse {
+	checkedAt := time.Now().UTC().Format(time.RFC3339)
 	entry := pluginHealthResponse{
 		PluginID:    manifest.ID,
 		PluginType:  manifest.Type,
@@ -61,7 +68,7 @@ func buildHealthEntry(manifest plugins.PluginManifest, p plugins.Plugin) pluginH
 		entry.Reachable = false
 		entry.LatencyMs = 0
 		entry.Detail = &detail
-		// CheckedAt is left empty — we have no timestamp from a failed call.
+		entry.CheckedAt = checkedAt
 		return entry
 	}
 

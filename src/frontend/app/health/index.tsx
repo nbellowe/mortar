@@ -295,7 +295,9 @@ const s = StyleSheet.create({
     fontWeight: '400',
   },
   separator: {
-    height: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.outlineVariant,
+    marginHorizontal: spacing.gutter,
   },
   errorBanner: {
     flexDirection: 'row',
