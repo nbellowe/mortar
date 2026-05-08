@@ -114,6 +114,8 @@ function MediaRow({ item, feedback, onRequestDone }: MediaRowProps) {
           ) : null}
           <TypeBadge type={item.type} />
         </View>
+        {/* TODO: show Available/Requested state by checking library.exists + pending requests (spec §7-8). */}
+        {/* TODO: show detail/confirmation modal before submitting (spec §user-flow-5). */}
         {feedback ? (
           <Text
             style={[
@@ -218,27 +220,30 @@ export default function SearchScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={results}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MediaRow
-              item={item}
-              feedback={feedback[item.id]}
-              onRequestDone={handleRequestDone}
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={
-            <View style={styles.centered}>
-              <Text style={styles.emptyText}>
-                {hasSearched
-                  ? 'No results found.'
-                  : 'Search for movies and TV shows to request.'}
-              </Text>
-            </View>
-          }
-        />
+        <>
+          {/* TODO: group results by media type: Movies, Shows, Audiobooks, Ebooks (spec §user-flow-4). */}
+          <FlatList
+            data={results}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <MediaRow
+                item={item}
+                feedback={feedback[item.id]}
+                onRequestDone={handleRequestDone}
+              />
+            )}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ListEmptyComponent={
+              <View style={styles.centered}>
+                <Text style={styles.emptyText}>
+                  {hasSearched
+                    ? 'No results found.'
+                    : 'Search for movies and TV shows to request.'}
+                </Text>
+              </View>
+            }
+          />
+        </>
       )}
     </View>
   );

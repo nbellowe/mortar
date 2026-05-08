@@ -85,6 +85,7 @@ function RequestRow({ request }: { request: Request }) {
 // ---------------------------------------------------------------------------
 
 const REFRESH_INTERVAL_MS = 30_000;
+// TODO: replace with authenticated user ID once auth is implemented.
 const REQUESTER_ID = 'anonymous';
 
 export default function RequestsScreen() {
@@ -122,6 +123,7 @@ export default function RequestsScreen() {
   }, [load]);
 
   // Auto-refresh every 30 seconds
+  // TODO: extract into shared usePollingInterval hook (ADR 0003: centralise refresh policy).
   useEffect(() => {
     const id = setInterval(() => {
       void load();

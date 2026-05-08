@@ -121,6 +121,7 @@ function PluginRow({ plugin }: { plugin: PluginHealth }) {
 const REFRESH_INTERVAL_MS = 60_000;
 
 export default function HealthScreen() {
+  // TODO: restrict to admin role once auth is wired up (health spec: admins only).
   const [plugins, setPlugins] = useState<PluginHealth[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +153,7 @@ export default function HealthScreen() {
   }, [load]);
 
   // Auto-refresh every 60 seconds
+  // TODO: extract into shared usePollingInterval hook (ADR 0003: centralise refresh policy).
   useEffect(() => {
     const id = setInterval(() => {
       void load();
