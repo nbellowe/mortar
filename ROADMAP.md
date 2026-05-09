@@ -38,6 +38,11 @@ This branch executes the current P0.
 
 These are the next items to keep current after P0 merges.
 
+### P1: Activity feed quality
+
+- [ ] Sonarr and Radarr activity events display raw release filenames (e.g. `FireFly.S01E13.1080p.BluRay.x264`) instead of show/movie titles. The `item.title` field is now correctly populated — the fix is to build a human-readable `Message` in the Sonarr/Radarr plugins from `series.Title` + episode info / `movie.Title` rather than passing through `sourceTitle`.
+- [ ] Radarr `mapEventType` has a catch-all fallback that maps unknown event types (e.g. `movieAdded`, `health`) to `ActivityEventDownloaded` instead of skipping them. Spurious "Downloaded" events appear for non-download activity. Fix: return `("", false)` for unrecognised types, matching Sonarr's behavior.
+
 ### P1: Prove the real end-to-end experience
 
 - [ ] Write and keep a release smoke-test checklist for all five committed flows.
