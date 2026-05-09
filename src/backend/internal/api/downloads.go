@@ -37,7 +37,7 @@ func downloadPriority(status string) int {
 // It fans out to all plugins implementing DownloadsReadable, merges the
 // results, sorts them by status priority, and always returns HTTP 200.
 // Plugin-level errors are reported in the failed_plugins field.
-func (h *handler) handleDownloads(w http.ResponseWriter, _ *http.Request) {
+func (h *handler) handleDownloads(w http.ResponseWriter, r *http.Request) {
 	all := h.registry.All()
 
 	var (
@@ -73,6 +73,15 @@ func (h *handler) handleDownloads(w http.ResponseWriter, _ *http.Request) {
 	sort.SliceStable(items, func(i, j int) bool {
 		return downloadPriority(items[i].Status) < downloadPriority(items[j].Status)
 	})
+
+	// Regular users see name, progress, ETA, and status only — no size, speed, or source.
+	if u := currentUser(r); u == nil || u.Role != "admin" {
+		for i := range items {
+			items[i].SizeBytes = 0
+			items[i].SpeedBytesS = 0
+			items[i].SourcePlugin = nil
+		}
+	}
 
 	if items == nil {
 		items = []plugins.DownloadItem{}

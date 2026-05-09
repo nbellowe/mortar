@@ -200,7 +200,12 @@ func (h *handler) handleLibraryPlay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url, err := library.GetPlayURL(*item, *currentUser(r))
+	user := currentUser(r)
+	if user == nil {
+		jsonError(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	url, err := library.GetPlayURL(*item, *user)
 	if err != nil {
 		jsonError(w, "failed to build playback handoff", http.StatusBadGateway)
 		return

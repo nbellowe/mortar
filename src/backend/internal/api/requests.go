@@ -418,6 +418,10 @@ func (h *handler) handleSubmitRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := currentUser(r)
+	if user == nil {
+		jsonError(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
 	created, err := requester.SubmitRequest(item, *user)
 	if err != nil {
 		jsonError(w, "submit request failed", http.StatusInternalServerError)

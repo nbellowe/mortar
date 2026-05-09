@@ -21,9 +21,10 @@ import (
 // Plugin is the Jellyseerr plugin implementation. It satisfies plugins.Plugin,
 // plugins.Requester, and plugins.ActivityReadable.
 type Plugin struct {
-	id         string
-	baseURL    string
-	httpClient *http.Client
+	id          string
+	baseURL     string
+	externalURL string // browser-accessible URL for admin review links; falls back to baseURL
+	httpClient  *http.Client
 	// apiKey is used only in outbound request headers; never logged or returned.
 	apiKey string
 }
@@ -38,10 +39,16 @@ func New(cfg config.PluginConfig) (plugins.Plugin, error) {
 		return nil, fmt.Errorf("jellyseerr: plugin %q is missing an api_key", cfg.ID)
 	}
 
+	baseURL := strings.TrimRight(cfg.URL, "/")
+	externalURL := strings.TrimRight(cfg.ExternalURL, "/")
+	if externalURL == "" {
+		externalURL = baseURL
+	}
 	return &Plugin{
-		id:      cfg.ID,
-		baseURL: strings.TrimRight(cfg.URL, "/"),
-		apiKey:  cfg.APIKey,
+		id:          cfg.ID,
+		baseURL:     baseURL,
+		externalURL: externalURL,
+		apiKey:      cfg.APIKey,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -318,7 +325,7 @@ func (p *Plugin) ReviewRequest(id string, review plugins.RequestReview) (plugins
 
 // ReviewURL returns the upstream request-management surface for admins.
 func (p *Plugin) ReviewURL(_ string) string {
-	return p.baseURL + "/requests"
+	return p.externalURL + "/requests"
 }
 
 // ---------------------------------------------------------------------------

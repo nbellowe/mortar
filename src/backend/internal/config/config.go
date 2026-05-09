@@ -29,12 +29,13 @@ type ServerConfig struct {
 // PluginConfig holds the configuration for a single plugin instance.
 // Secrets (api_key, password, etc.) should use ${VAR} interpolation.
 type PluginConfig struct {
-	ID       string `yaml:"id"`
-	Type     string `yaml:"type"`
-	URL      string `yaml:"url"`
-	APIKey   string `yaml:"api_key,omitempty"`
-	Username string `yaml:"username,omitempty"`
-	Password string `yaml:"password,omitempty"`
+	ID          string `yaml:"id"`
+	Type        string `yaml:"type"`
+	URL         string `yaml:"url"`
+	ExternalURL string `yaml:"external_url,omitempty"`
+	APIKey      string `yaml:"api_key,omitempty"`
+	Username    string `yaml:"username,omitempty"`
+	Password    string `yaml:"password,omitempty"`
 }
 
 // UserConfig bootstraps a Mortar user and any upstream account links.

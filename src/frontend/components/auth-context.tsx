@@ -63,10 +63,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (username: string, password: string) => {
     setLoading(true);
+    setError(null);
     try {
       const session = await loginRequest(username, password);
       setUser(session.user);
-      setError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Login failed";
+      setError(msg);
+      throw err;
     } finally {
       setLoading(false);
     }

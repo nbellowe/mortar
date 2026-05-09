@@ -133,7 +133,7 @@ type sonarrEpisodeSummary struct {
 func (p *Plugin) GetActivity(since *string) ([]plugins.ActivityEvent, error) {
 	req, err := http.NewRequest(
 		http.MethodGet,
-		p.baseURL+"/api/v3/history?pageSize=50&sortKey=date&sortDirection=descending",
+		p.baseURL+"/api/v3/history?pageSize=50&sortKey=date&sortDirection=descending&includeSeries=true",
 		nil,
 	)
 	if err != nil {

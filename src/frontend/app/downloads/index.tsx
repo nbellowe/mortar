@@ -175,7 +175,7 @@ export default function DownloadsScreen() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const result = await getDownloads();
+      const result = await getDownloads(controller.signal);
       setData(result);
       setError(null);
     } catch (err) {

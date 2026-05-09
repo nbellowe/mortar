@@ -149,7 +149,7 @@ function HealthBadge({ summary }: { summary: HomeResponse["health_summary"] }) {
 }
 
 export default function HomeScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [data, setData] = useState<HomeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -192,20 +192,10 @@ export default function HomeScreen() {
   return (
     <View style={s.container}>
       <View style={s.topBar}>
-        <View>
-          <Text style={s.topBarTitle}>Mortar</Text>
-          {user ? (
-            <Text style={s.topBarSubtitle}>Signed in as {user.username}</Text>
-          ) : null}
-        </View>
-        <TouchableOpacity
-          style={s.signOutBtn}
-          onPress={() => {
-            void logout();
-          }}
-        >
-          <Text style={s.signOutBtnText}>Sign out</Text>
-        </TouchableOpacity>
+        <Text style={s.topBarTitle}>Mortar</Text>
+        {user ? (
+          <Text style={s.topBarSubtitle}>Signed in as {user.username}</Text>
+        ) : null}
       </View>
 
       {loading ? (
@@ -329,10 +319,6 @@ const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.outlineVariant,
     backgroundColor: colors.surface,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.base,
   },
   topBarTitle: {
     ...type.headlineLg,
@@ -341,16 +327,6 @@ const s = StyleSheet.create({
   },
   topBarSubtitle: {
     ...type.labelSm,
-    color: colors.onSurfaceVariant,
-  },
-  signOutBtn: {
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surfaceContainer,
-  },
-  signOutBtnText: {
-    ...type.labelMd,
     color: colors.onSurfaceVariant,
   },
   centered: {

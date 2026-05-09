@@ -11,6 +11,8 @@ import (
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
 )
 
+const activityFanOutTimeout = 10 * time.Second
+
 // activityResponse is the JSON body returned by GET /api/v1/activity.
 type activityResponse struct {
 	Events        []plugins.ActivityEvent `json:"events"`
@@ -58,7 +60,15 @@ func (h *handler) handleActivity(w http.ResponseWriter, r *http.Request) {
 		}(ar, manifest.DisplayName)
 	}
 
-	wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(activityFanOutTimeout):
+	}
 
 	user := currentUser(r)
 	if user != nil {
@@ -82,15 +92,14 @@ func (h *handler) handleActivity(w http.ResponseWriter, r *http.Request) {
 		return ti.After(tj)
 	})
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	if events == nil {
 		events = []plugins.ActivityEvent{}
 	}
 	if failedPlugins == nil {
 		failedPlugins = []string{}
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(activityResponse{
 		Events:        events,
 		FailedPlugins: failedPlugins,

@@ -83,10 +83,16 @@ const TAB_ITEMS: NavItem[] = [
     iconActive: "receipt",
   },
   {
-    label: "Health",
-    href: "/health",
-    icon: "heart-outline",
-    iconActive: "heart",
+    label: "Activity",
+    href: "/activity",
+    icon: "list-outline",
+    iconActive: "list",
+  },
+  {
+    label: "Downloads",
+    href: "/downloads",
+    icon: "cloud-download-outline",
+    iconActive: "cloud-download",
   },
 ];
 
@@ -202,14 +208,6 @@ function RootLayoutContent() {
               />
             );
           })}
-          <Tabs.Screen
-            name="activity/index"
-            options={{ tabBarButton: () => null }}
-          />
-          <Tabs.Screen
-            name="downloads/index"
-            options={{ tabBarButton: () => null }}
-          />
           <Tabs.Screen
             name="library/index"
             options={{ tabBarButton: () => null }}

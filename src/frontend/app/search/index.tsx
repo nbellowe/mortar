@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { playLibraryItem } from "../../api/library";
 import { searchMedia, submitRequest } from "../../api/requests";
+import { useAuth } from "../../components/auth-context";
 import type { LibraryMatch, MediaItem, Request } from "../../types/plugin";
 import { colors, radius, spacing, type } from "@/theme/tokens";
 
@@ -90,17 +91,21 @@ function actionStateForItem(
   if (match) {
     return { kind: "available" as const, label: "Open in Jellyfin", match };
   }
-  if (
-    request &&
-    (request.status === "pending" ||
+  if (request) {
+    if (
+      request.status === "pending" ||
       request.status === "approved" ||
-      request.status === "available")
-  ) {
-    return {
-      kind: "requested" as const,
-      label: request.status.charAt(0).toUpperCase() + request.status.slice(1),
-      request,
-    };
+      request.status === "available"
+    ) {
+      return {
+        kind: "requested" as const,
+        label: request.status.charAt(0).toUpperCase() + request.status.slice(1),
+        request,
+      };
+    }
+    if (request.status === "failed" || request.status === "declined") {
+      return { kind: "request" as const, label: "Retry" };
+    }
   }
   return { kind: "request" as const, label: "Request" };
 }
@@ -109,12 +114,14 @@ function ActionButton({
   item,
   actionState,
   feedback,
+  requesting,
   onRequest,
   onPlay,
 }: {
   item: MediaItem;
   actionState: ReturnType<typeof actionStateForItem>;
   feedback?: string;
+  requesting: boolean;
   onRequest: (item: MediaItem) => void;
   onPlay: (itemId: string) => void;
 }) {
@@ -144,6 +151,10 @@ function ActionButton({
     );
   }
 
+  if (requesting) {
+    return <ActivityIndicator size="small" color={colors.primary} />;
+  }
+
   return (
     <TouchableOpacity style={s.requestBtn} onPress={() => onRequest(item)}>
       <Ionicons
@@ -151,7 +162,7 @@ function ActionButton({
         size={16}
         color={colors.onPrimaryContainer}
       />
-      <Text style={s.requestBtnText}>Request</Text>
+      <Text style={s.requestBtnText}>{actionState.label}</Text>
     </TouchableOpacity>
   );
 }
@@ -161,6 +172,7 @@ function MediaCard({
   matches,
   requests,
   feedback,
+  requesting,
   onRequest,
   onPlay,
 }: {
@@ -168,6 +180,7 @@ function MediaCard({
   matches: Map<string, LibraryMatch>;
   requests: Map<string, Request>;
   feedback?: string;
+  requesting: boolean;
   onRequest: (item: MediaItem) => void;
   onPlay: (itemId: string) => void;
 }) {
@@ -187,6 +200,7 @@ function MediaCard({
           item={item}
           actionState={actionState}
           feedback={feedback}
+          requesting={requesting}
           onRequest={onRequest}
           onPlay={onPlay}
         />
@@ -196,6 +210,7 @@ function MediaCard({
 }
 
 export default function SearchScreen() {
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<MediaItem[]>([]);
   const [failedPlugins, setFailedPlugins] = useState<string[]>([]);
@@ -205,6 +220,7 @@ export default function SearchScreen() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackMap>({});
+  const [requestingId, setRequestingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const handleSearch = useCallback(async (q: string) => {
@@ -272,28 +288,21 @@ export default function SearchScreen() {
   }, [results]);
 
   const handleRequest = useCallback(async (item: MediaItem) => {
+    if (requestingId != null) return;
+    setRequestingId(item.id);
     try {
-      await submitRequest(item);
+      const created = await submitRequest(item);
       setFeedback((prev) => ({ ...prev, [item.id]: "Requested" }));
-      setExistingRequests((prev) => [
-        {
-          id: `${item.plugin_id}:pending:${item.external_id}`,
-          plugin_id: item.plugin_id,
-          item,
-          requester_id: "current-user",
-          status: "pending",
-          submitted_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
+      setExistingRequests((prev) => [created, ...prev]);
     } catch (err) {
       setFeedback((prev) => ({
         ...prev,
         [item.id]: err instanceof Error ? err.message : "Failed",
       }));
+    } finally {
+      setRequestingId(null);
     }
-  }, []);
+  }, [requestingId, user]);
 
   const handlePlay = useCallback(async (itemId: string) => {
     const result = await playLibraryItem(itemId);
@@ -397,7 +406,8 @@ export default function SearchScreen() {
                     matches={matchesMap}
                     requests={requestMap}
                     feedback={feedback[item.id]}
-                    onRequest={handleRequest}
+                    requesting={requestingId === item.id}
+                    onRequest={(i) => { void handleRequest(i); }}
                     onPlay={(itemId) => {
                       void handlePlay(itemId);
                     }}
