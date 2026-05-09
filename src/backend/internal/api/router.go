@@ -1,6 +1,4 @@
 // Package api wires up the Mortar HTTP router.
-// Feature routes are added in later phases; only the /health ping is
-// provided here so the server can be verified to be running.
 package api
 
 import (
@@ -24,7 +22,6 @@ type handler struct {
 }
 
 // NewRouter constructs and returns the root HTTP router.
-// Feature sub-routers are mounted here as they are implemented.
 func NewRouter(cfg *config.Config, reg *plugins.Registry, database *db.DB, webFS fs.FS) http.Handler {
 	h := &handler{registry: reg, database: database}
 
@@ -54,6 +51,9 @@ func NewRouter(cfg *config.Config, reg *plugins.Registry, database *db.DB, webFS
 	r.Get("/api/v1/requests", h.handleListRequests)
 	r.Post("/api/v1/requests", h.handleSubmitRequest)
 	r.Get("/api/v1/requests/{id}", h.handleGetRequest)
+	r.Get("/api/v1/activity", h.handleActivity)
+	r.Get("/api/v1/downloads", h.handleDownloads)
+	r.Get("/api/v1/home", h.handleHome)
 
 	r.Handle("/*", spaHandler(webFS))
 

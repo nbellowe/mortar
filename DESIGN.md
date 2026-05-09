@@ -32,19 +32,22 @@ The UI should feel:
 
 ## Visual direction
 
-Design reference: a comfortable media room with good lighting, tactile surfaces, and clear signage.
+Design reference: a comfortable media room in the evening — warm, dim, cinema-like.
+
+The app uses a **dark theme by default**. The palette is warm brown-black (not cool grey or neon), consistent with the "Digital Hearth" color system adopted in the initial frontend implementation.
 
 Avoid:
 
-- dark cyberpunk dashboards
+- cold, blue-tinted dark UIs
 - bright purple SaaS gradients
 - raw server-admin aesthetics
 - overuse of glassmorphism or chrome-heavy cards
+- neon or high-saturation cyberpunk accents
 
 Prefer:
 
-- warm neutral backgrounds
-- earthy accent colors
+- warm dark backgrounds (deep brown-black, not grey)
+- earthy, muted accent colors with warm orange-peach primaries
 - strong poster imagery
 - rounded, touch-friendly surfaces
 - restrained motion
@@ -55,20 +58,22 @@ These names are stable even if individual values are tuned later.
 
 ### Color
 
+The canonical token values are defined in `src/frontend/theme/tokens.ts`. The table below maps semantic names to their current dark-theme values.
+
 | Token | Value | Use |
 |---|---|---|
-| `color.bg.canvas` | `#F3EEE7` | App background |
-| `color.bg.surface` | `#FBF7F1` | Cards, sheets, panels |
-| `color.bg.elevated` | `#FFFFFF` | Raised dialogs and focused surfaces |
-| `color.fg.default` | `#1F1A17` | Primary text |
-| `color.fg.muted` | `#6C625A` | Secondary text |
-| `color.border.subtle` | `#D8CEC3` | Dividers, light borders |
-| `color.brand.primary` | `#C35A2C` | Primary actions, active states |
-| `color.brand.strong` | `#8F3E1D` | Pressed states, emphasis |
-| `color.info` | `#356D8C` | Informational accents |
-| `color.success` | `#2E7A57` | Available, healthy |
-| `color.warning` | `#A56A12` | Queued, degraded |
-| `color.danger` | `#B13C2E` | Failed, unreachable |
+| `color.bg.canvas` | `#1b110d` | App background |
+| `color.bg.surface` | `#281d19` | Cards, sheets, panels |
+| `color.bg.elevated` | `#3e322e` | Raised dialogs and focused surfaces |
+| `color.fg.default` | `#f3ded8` | Primary text |
+| `color.fg.muted` | `#ddc0b6` | Secondary text |
+| `color.border.subtle` | `#56423b` | Dividers, borders |
+| `color.brand.primary` | `#ffb599` | Primary actions, active states |
+| `color.brand.strong` | `#e17141` | Pressed states, emphasis |
+| `color.info` | `#74d2f6` | Informational accents |
+| `color.success` | `#81c784` | Available, healthy |
+| `color.warning` | `#ffb74d` | Queued, degraded |
+| `color.danger` | `#e57373` | Failed, unreachable |
 
 ### Typography
 
