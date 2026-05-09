@@ -60,6 +60,11 @@ func (h *handler) handleActivity(w http.ResponseWriter, r *http.Request) {
 
 	wg.Wait()
 
+	user := currentUser(r)
+	if user != nil {
+		events = h.filterVisibleEvents(events, *user)
+	}
+
 	// Sort events by timestamp descending; events with unparseable timestamps
 	// sort last.
 	sort.SliceStable(events, func(i, j int) bool {
@@ -90,4 +95,33 @@ func (h *handler) handleActivity(w http.ResponseWriter, r *http.Request) {
 		Events:        events,
 		FailedPlugins: failedPlugins,
 	})
+}
+
+func (h *handler) filterVisibleEvents(events []plugins.ActivityEvent, user plugins.MortarUser) []plugins.ActivityEvent {
+	filtered := make([]plugins.ActivityEvent, 0, len(events))
+	for _, event := range events {
+		switch event.Visibility {
+		case plugins.ActivityVisibilityAllUsers:
+			filtered = append(filtered, event)
+		case plugins.ActivityVisibilityAdminOnly:
+			if user.Role == "admin" {
+				filtered = append(filtered, event)
+			}
+		case plugins.ActivityVisibilityRequesterAndAdmin:
+			if user.Role == "admin" {
+				filtered = append(filtered, event)
+				continue
+			}
+			if event.ActorUserID == nil || h.store == nil {
+				continue
+			}
+			mortarUserID, err := h.store.LookupMortarUserIDByExternalAccount(event.SourcePlugin, *event.ActorUserID)
+			if err == nil && mortarUserID == user.ID {
+				cloned := event
+				cloned.ActorUserID = &mortarUserID
+				filtered = append(filtered, cloned)
+			}
+		}
+	}
+	return filtered
 }

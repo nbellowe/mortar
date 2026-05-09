@@ -196,6 +196,12 @@ type Requester interface {
 	ReviewRequest(id string, review RequestReview) (Request, error)
 }
 
+// RequestReviewURLProvider is an optional interface for plugins that can link
+// admins out to the upstream request-management surface.
+type RequestReviewURLProvider interface {
+	ReviewURL(id string) string
+}
+
 // BrowseOptions parameterises a library browse call.
 type BrowseOptions struct {
 	Type     *MediaType `json:"type,omitempty"`

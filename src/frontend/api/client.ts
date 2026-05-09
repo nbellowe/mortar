@@ -9,10 +9,10 @@
 
 /** The base URL of the Mortar Go server. Override via environment in development. */
 const BASE_URL: string =
-  process.env['EXPO_PUBLIC_MORTAR_API_URL'] ?? 'http://localhost:3000';
+  process.env["EXPO_PUBLIC_MORTAR_API_URL"] ?? "http://localhost:3000";
 
 /** HTTP methods supported by the client. */
-type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 /** Options for a client request, excluding method and body (handled per-function). */
 interface RequestOptions {
@@ -32,7 +32,7 @@ export class MortarAPIError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = 'MortarAPIError';
+    this.name = "MortarAPIError";
   }
 }
 
@@ -53,16 +53,13 @@ async function request<T>(
 
   // Only include Content-Type when there is a body to send.
   if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
+    headers["Content-Type"] = "application/json";
   }
 
   const init: RequestInit = {
     method,
     headers,
-    // Use 'same-origin' so credentials are sent only when on the same origin as
-    // the server (production). In development Expo runs on a different port, so
-    // no credentials are sent — acceptable while auth is not yet implemented.
-    credentials: 'same-origin',
+    credentials: "include",
     signal: options.signal,
   };
 
@@ -98,22 +95,22 @@ async function request<T>(
  */
 export const api = {
   get<T>(path: string, options?: RequestOptions): Promise<T> {
-    return request<T>('GET', path, undefined, options);
+    return request<T>("GET", path, undefined, options);
   },
 
   post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
-    return request<T>('POST', path, body, options);
+    return request<T>("POST", path, body, options);
   },
 
   patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
-    return request<T>('PATCH', path, body, options);
+    return request<T>("PATCH", path, body, options);
   },
 
   put<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
-    return request<T>('PUT', path, body, options);
+    return request<T>("PUT", path, body, options);
   },
 
   delete<T>(path: string, options?: RequestOptions): Promise<T> {
-    return request<T>('DELETE', path, undefined, options);
+    return request<T>("DELETE", path, undefined, options);
   },
 };

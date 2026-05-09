@@ -15,7 +15,8 @@ server:
   # TCP port the Mortar HTTP server listens on.
   # Default: 3000
   port: 3000
-  # allowed_origins restricts CORS to specific origins. Defaults to ["*"] if omitted.
+  # allowed_origins restricts CORS to specific origins. Set this when running
+  # the Expo web dev server on a different origin and you want session-cookie auth.
   # allowed_origins:
   #   - "http://localhost:8081"
   #   - "https://mortar.yourdomain.com"
@@ -62,11 +63,6 @@ plugins:
     url: http://radarr:7878
     api_key: ${RADARR_API_KEY}
 
-  - id: audiobookrequest
-    type: audiobookrequest
-    url: http://audiobookrequest:8080
-    api_key: ${ABR_API_KEY}
-
 # ---------------------------------------------------------------------------
 # Request routing (ADR 0006)
 # ---------------------------------------------------------------------------
@@ -75,8 +71,8 @@ plugins:
 # capability. With a single candidate, Mortar auto-routes and no entry is
 # needed. Startup fails with a clear error if an ambiguity is unresolved.
 #
-# The example plugins above each cover a distinct capability (jellyseerr →
-# video, audiobookrequest → audio), so no routing block is required.
+# The example plugins above expose only one request capability (`requests.video`
+# through Jellyseerr), so no routing block is required.
 #
 # Uncomment and fill in the block below only if you add a second plugin that
 # overlaps an existing capability:
@@ -84,5 +80,32 @@ plugins:
 # routing:
 #   requests:
 #     video: jellyseerr       # required if you had two video-request plugins
-#     audio: audiobookrequest # required if you had two audio-request plugins
 #     # ebook: my-ebook-plugin
+
+# ---------------------------------------------------------------------------
+# Mortar users and upstream account links
+# ---------------------------------------------------------------------------
+#
+# Mortar owns household logins. At startup the server seeds or updates the
+# users below, hashing their passwords before storing them in SQLite.
+#
+# Browse & Play and Continue Watching require an external account link for the
+# relevant library plugin. In v1, those links are seeded here rather than via
+# an admin UI.
+
+users:
+  - username: admin
+    password: ${MORTAR_ADMIN_PASSWORD}
+    role: admin
+    external_accounts:
+      - plugin_id: jellyfin
+        external_user_id: ${JELLYFIN_ADMIN_USER_ID}
+        external_username: admin
+
+  - username: family
+    password: ${MORTAR_FAMILY_PASSWORD}
+    role: user
+    external_accounts:
+      - plugin_id: jellyfin
+        external_user_id: ${JELLYFIN_FAMILY_USER_ID}
+        external_username: family

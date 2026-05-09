@@ -6,11 +6,15 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"testing"
 	"testing/fstest"
 
 	"github.com/nbellowe/mortar/src/backend/internal/api"
+	"github.com/nbellowe/mortar/src/backend/internal/appstate"
 	"github.com/nbellowe/mortar/src/backend/internal/config"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
+	"github.com/nbellowe/mortar/src/db"
 )
 
 // ---------------------------------------------------------------------------
@@ -124,6 +128,26 @@ func buildRegistry(ps map[string]plugins.Plugin, routes map[string]string) *plug
 func newTestServer(reg *plugins.Registry) *httptest.Server {
 	router := api.NewRouter(&config.Config{}, reg, nil, fstest.MapFS{})
 	return httptest.NewServer(router)
+}
+
+func newTestServerWithConfig(t *testing.T, cfg *config.Config, reg *plugins.Registry) (*httptest.Server, *db.DB) {
+	t.Helper()
+
+	database, err := db.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	if err := appstate.New(database).SyncUsersFromConfig(cfg.Users); err != nil {
+		t.Fatalf("sync users: %v", err)
+	}
+
+	router := api.NewRouter(cfg, reg, database, fstest.MapFS{})
+	server := httptest.NewServer(router)
+	t.Cleanup(func() {
+		server.Close()
+		_ = database.Close()
+	})
+	return server, database
 }
 
 // jsonBody marshals v to JSON and returns an *http.Request with it as the

@@ -316,6 +316,11 @@ func (p *Plugin) ReviewRequest(id string, review plugins.RequestReview) (plugins
 	return p.mapRequest(jsReq), nil
 }
 
+// ReviewURL returns the upstream request-management surface for admins.
+func (p *Plugin) ReviewURL(_ string) string {
+	return p.baseURL + "/requests"
+}
+
 // ---------------------------------------------------------------------------
 // ActivityReadable interface (activity.read)
 // ---------------------------------------------------------------------------

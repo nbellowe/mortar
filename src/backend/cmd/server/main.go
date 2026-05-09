@@ -13,6 +13,7 @@ import (
 	"os"
 
 	"github.com/nbellowe/mortar/src/backend/internal/api"
+	"github.com/nbellowe/mortar/src/backend/internal/appstate"
 	"github.com/nbellowe/mortar/src/backend/internal/config"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
 	"github.com/nbellowe/mortar/src/backend/internal/plugins/jellyfin"
@@ -40,6 +41,10 @@ func main() {
 	database, err := db.Open(*dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mortar: database init failed: %v\n", err)
+		os.Exit(1)
+	}
+	if err := appstate.New(database).SyncUsersFromConfig(cfg.Users); err != nil {
+		fmt.Fprintf(os.Stderr, "mortar: user bootstrap failed: %v\n", err)
 		os.Exit(1)
 	}
 

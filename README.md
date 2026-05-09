@@ -6,7 +6,7 @@ Mortar does not replace any existing service. It connects to them via their APIs
 
 ## Status
 
-Early spec phase. Product direction and release scope are defined, but implementation has not started yet. See [`ROADMAP.md`](ROADMAP.md) for milestone goals and [`specs/`](specs/) for design documents.
+Active `v0.1.0-alpha` implementation. The server, reference plugins, and web client flows are in progress, with Browse & Play plus auth/linking now part of the working alpha path. See [`ROADMAP.md`](ROADMAP.md) for milestone goals and [`specs/`](specs/) for design documents.
 
 ## Core idea
 
