@@ -24,7 +24,7 @@ import (
 	"github.com/nbellowe/mortar/src/db"
 )
 
-//go:embed web
+//go:embed all:web
 var webFS embed.FS
 
 func main() {

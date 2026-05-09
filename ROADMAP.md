@@ -44,6 +44,7 @@ These are the next items to keep current after P0 merges.
 - [ ] Do a focused Browse & Play pass on desktop and mobile browsers, especially the Jellyfin handoff.
 - [ ] Decide whether the current "open Jellyfin to play" behavior is good enough for alpha or needs a different plan.
 - [ ] Add at least one deeper integration test path that exercises auth plus a real plugin-backed flow.
+- [ ] Add decent telemetry to make it easy to track how well its working.
 
 ### P1: Distribution
 
@@ -61,7 +62,12 @@ These are the next items to keep current after P0 merges.
 
 ### `v0.1.0-alpha`
 
-- The supported stack can be configured without code changes.
+Goal: prove the architecture with a real, rough, end-to-end Mortar system.
+
+- The server runs locally.
+- The web client runs locally.
+- A Docker-based server install path exists.
+- The supported reference stack can be configured without code changes.
 - All five committed flows are demonstrable end to end on the supported path.
 - The rough edges are understood well enough to guide the next product decisions.
 
@@ -74,7 +80,16 @@ These are the next items to keep current after P0 merges.
 
 ### `v1.0.0`
 
+Goal: ship a stable, supported, web-first baseline for the reference stack.
+
 - The web experience is the clearly supported primary surface.
 - The reference stack is stable and compatibility-defined.
+- All five committed flows are stable on the supported reference stack.
 - Release, upgrade, and security policies are documented.
 - No release-critical roadmap or spec blockers remain.
+
+## Notes
+
+- This roadmap is scope-based, not date-based.
+- Native clients are still part of the long-term architecture direction, but they are not `v1.0` release-blocking.
+- Additional plugins may land before `v1.0`, but only the reference stack defines `v1.0` readiness.
