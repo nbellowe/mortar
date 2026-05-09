@@ -5,8 +5,10 @@
 package main
 
 import (
+	"embed"
 	"flag"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 
@@ -21,8 +23,12 @@ import (
 	"github.com/nbellowe/mortar/src/db"
 )
 
+//go:embed web
+var webFS embed.FS
+
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to the Mortar config file")
+	dbPath := flag.String("db", "mortar.db", "path to the SQLite database file")
 	flag.Parse()
 
 	cfg, err := config.Load(*configPath)
@@ -31,7 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	database, err := db.Open("mortar.db")
+	database, err := db.Open(*dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mortar: database init failed: %v\n", err)
 		os.Exit(1)
@@ -50,7 +56,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	router := api.NewRouter(cfg, registry, database)
+	webAssets, err := fs.Sub(webFS, "web")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "mortar: web assets unavailable: %v\n", err)
+		os.Exit(1)
+	}
+
+	router := api.NewRouter(cfg, registry, database, webAssets)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	fmt.Printf("mortar: listening on %s\n", addr)
