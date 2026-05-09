@@ -179,11 +179,14 @@ The Mortar server is distributed as a single Docker image. Configuration is prov
 
 ```
 docker run \
-  -v ./mortar.yaml:/config/mortar.yaml \
+  -v ./config.yaml:/data/config.yaml:ro \
+  -v mortar-data:/data \
   -e JELLYSEERR_API_KEY=... \
   -p 3000:3000 \
-  mortar:latest
+  ghcr.io/nbellowe/mortar:latest
 ```
+
+The container mounts all persistent data (config and SQLite database) under `/data`. Config is bind-mounted read-only; the database lives in a named volume at `/data/mortar.db`.
 
 Frontend delivery is split by platform:
 
