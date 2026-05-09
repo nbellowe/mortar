@@ -1,38 +1,31 @@
-/**
- * Home screen — Mortar dashboard.
- *
- * Shows a health badge (when any service is unreachable), a Continue Watching
- * placeholder (pending auth), and a Recently Added row backed by live API data.
- * Data is fetched once on mount — no auto-polling (this is not a live operational view).
- * Spec: specs/features/home.md
- */
-
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { Link } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
-import { getHome, HomeResponse } from '../api/home';
-import type { MediaItem } from '../types/plugin';
-import { colors, radius, spacing, type } from '@/theme/tokens';
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
+import { getHome, HomeResponse } from "../api/home";
+import { playLibraryItem } from "../api/library";
+import { useAuth } from "../components/auth-context";
+import type { ContinueWatchingItem, MediaItem } from "../types/plugin";
+import { colors, radius, spacing, type } from "@/theme/tokens";
 
 function SectionHeader({
   icon,
   title,
-  action,
+  href,
 }: {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
+  icon: React.ComponentProps<typeof Ionicons>["name"];
   title: string;
-  action?: string;
+  href?: "/" | `/${string}`;
 }) {
   return (
     <View style={s.sectionHeader}>
@@ -40,42 +33,50 @@ function SectionHeader({
         <Ionicons name={icon} size={20} color={colors.primaryFixedDim} />
         <Text style={s.sectionTitle}>{title}</Text>
       </View>
-      {action ? <Text style={s.sectionAction}>{action}</Text> : null}
+      {href ? (
+        <Link href={href} style={s.sectionAction}>
+          View all
+        </Link>
+      ) : null}
     </View>
   );
 }
 
-/** Subtle setup prompt shown in place of a Continue Watching section header. */
-function ContinueWatchingPlaceholder() {
-  // TODO: replace with real continue-watching data once auth is implemented (ADR 0005).
+function InlineMessage({
+  icon,
+  title,
+  body,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  title: string;
+  body: string;
+}) {
   return (
-    <View style={s.linkedAccountCard}>
-      <Ionicons name="person-circle-outline" size={40} color={colors.outline} />
-      <Text style={s.linkedAccountTitle}>Link your account to see Continue Watching</Text>
-      <Text style={s.linkedAccountBody}>
-        Connect your Jellyfin account to track what you&apos;ve been watching.
-      </Text>
+    <View style={s.infoCard}>
+      <Ionicons name={icon} size={24} color={colors.outline} />
+      <View style={s.infoBody}>
+        <Text style={s.infoTitle}>{title}</Text>
+        <Text style={s.infoText}>{body}</Text>
+      </View>
     </View>
   );
 }
 
-/** Empty poster-shaped placeholder used during loading (skeleton stand-in). */
-function PosterSkeleton() {
-  return (
-    <View style={s.posterCard}>
-      <View style={[s.posterImage, s.posterSkeleton]} />
-      <View style={s.skeletonTextLine} />
-      <View style={[s.skeletonTextLine, s.skeletonTextShort]} />
-    </View>
-  );
-}
-
-/** Single poster card backed by a real MediaItem. */
-function PosterCard({ item }: { item: MediaItem }) {
+function PosterCard({
+  item,
+  subtitle,
+  badge,
+  onPress,
+}: {
+  item: MediaItem;
+  subtitle?: string;
+  badge?: string;
+  onPress: () => void;
+}) {
   const [imgFailed, setImgFailed] = useState(false);
 
   return (
-    <View style={s.posterCard}>
+    <TouchableOpacity style={s.posterCard} onPress={onPress}>
       <View style={s.posterImage}>
         {item.poster_url && !imgFailed ? (
           <Image
@@ -85,109 +86,74 @@ function PosterCard({ item }: { item: MediaItem }) {
             onError={() => setImgFailed(true)}
           />
         ) : (
-          <Ionicons name="film-outline" size={32} color={colors.outline} />
+          <Ionicons name="film-outline" size={28} color={colors.outline} />
         )}
       </View>
-      <Text style={s.posterTitle} numberOfLines={1}>{item.title}</Text>
-      <Text style={s.posterSubtitle}>{item.year ?? '—'}</Text>
-    </View>
+      {badge ? (
+        <View style={s.badge}>
+          <Text style={s.badgeText}>{badge}</Text>
+        </View>
+      ) : null}
+      <Text style={s.posterTitle} numberOfLines={1}>
+        {item.title}
+      </Text>
+      <Text style={s.posterSubtitle}>{subtitle ?? item.year ?? "—"}</Text>
+    </TouchableOpacity>
   );
 }
 
-/** The "+" request card always shown at the end of the Recently Added row. */
-function RequestCard() {
+function ProgressBar({ progress }: { progress: number }) {
   return (
-    <View style={s.posterCardAdd}>
-      <Ionicons name="add-circle-outline" size={28} color={colors.outline} />
-      <Text style={s.posterAddLabel}>Request</Text>
+    <View style={s.progressTrack}>
+      <View
+        style={[
+          s.progressFill,
+          { width: `${Math.min(Math.max(progress, 0), 1) * 100}%` },
+        ]}
+      />
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Section: Health badge
-// ---------------------------------------------------------------------------
+function ContinueWatchingCard({
+  entry,
+  onPress,
+}: {
+  entry: ContinueWatchingItem;
+  onPress: () => void;
+}) {
+  return (
+    <View style={s.continueCard}>
+      <PosterCard
+        item={entry.item}
+        subtitle="Resume"
+        badge={`${Math.round(entry.progress * 100)}%`}
+        onPress={onPress}
+      />
+      <ProgressBar progress={entry.progress} />
+    </View>
+  );
+}
 
-function HealthBadge({ summary }: { summary: HomeResponse['health_summary'] }) {
+function HealthBadge({ summary }: { summary: HomeResponse["health_summary"] }) {
   if (!summary.any_unreachable) return null;
-
   return (
     <View style={s.healthBadge}>
       <Ionicons name="warning" size={14} color={colors.statusUnreachable} />
       <Text style={s.healthBadgeText}>
-        {summary.unreachable_count} service{summary.unreachable_count !== 1 ? 's' : ''} unreachable
+        {summary.unreachable_count} service
+        {summary.unreachable_count !== 1 ? "s" : ""} unreachable
       </Text>
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Section: Recently Added
-// ---------------------------------------------------------------------------
-
-function RecentlyAddedRow({
-  loading,
-  error,
-  items,
-}: {
-  loading: boolean;
-  error: string | null;
-  items: MediaItem[];
-}) {
-  if (loading) {
-    return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.posterRow}
-      >
-        <PosterSkeleton />
-        <PosterSkeleton />
-        <PosterSkeleton />
-      </ScrollView>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={s.inlineError}>
-        <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
-        <Text style={s.inlineErrorText}>Could not load recent additions</Text>
-      </View>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <View style={s.emptyRow}>
-        <Text style={s.emptyRowText}>No recent additions</Text>
-      </View>
-    );
-  }
-
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={s.posterRow}
-    >
-      {items.map((item) => (
-        <PosterCard key={item.id} item={item} />
-      ))}
-      <RequestCard />
-    </ScrollView>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
-
 export default function HomeScreen() {
-  const [recentlyAdded, setRecentlyAdded] = useState<MediaItem[]>([]);
-  const [healthSummary, setHealthSummary] = useState<HomeResponse['health_summary'] | null>(null);
+  const { user } = useAuth();
+  const [data, setData] = useState<HomeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
@@ -195,59 +161,152 @@ export default function HomeScreen() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const data = await getHome(controller.signal);
-      setRecentlyAdded(data.recently_added);
-      setHealthSummary(data.health_summary);
+      const home = await getHome(controller.signal);
+      setData(home);
       setError(null);
     } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-      setError(err instanceof Error ? err.message : 'Failed to load home data');
+      if ((err as Error).name === "AbortError") return;
+      setError(err instanceof Error ? err.message : "Failed to load home");
     } finally {
       setLoading(false);
     }
   }, []);
 
+  const handlePlay = useCallback(async (itemId: string) => {
+    setPlayingId(itemId);
+    try {
+      const result = await playLibraryItem(itemId);
+      await Linking.openURL(result.url);
+    } finally {
+      setPlayingId(null);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
-    return () => { abortRef.current?.abort(); };
+    return () => {
+      abortRef.current?.abort();
+    };
   }, [load]);
 
   return (
     <View style={s.container}>
       <View style={s.topBar}>
         <Text style={s.topBarTitle}>Mortar</Text>
+        {user ? (
+          <Text style={s.topBarSubtitle}>Signed in as {user.username}</Text>
+        ) : null}
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll}>
-        {/* Hero */}
-        <View style={s.hero}>
-          <Text style={s.heroGreeting}>Good evening.</Text>
-          <Text style={s.heroSubtitle}>Your library is ready.</Text>
-          {healthSummary ? <HealthBadge summary={healthSummary} /> : null}
+      {loading ? (
+        <View style={s.centered}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-
-        {/* Continue Watching — placeholder until auth is implemented */}
-        <View style={s.section}>
-          <ContinueWatchingPlaceholder />
-        </View>
-
-        {/* Recently Added */}
-        <View style={s.section}>
-          <SectionHeader icon="star-outline" title="Recently Added" action="View all" />
-          <RecentlyAddedRow
-            loading={loading}
-            error={error}
-            items={recentlyAdded}
+      ) : error || !data ? (
+        <View style={s.centered}>
+          <InlineMessage
+            icon="warning-outline"
+            title="Home could not load"
+            body={error ?? "Try again in a moment."}
           />
+          <TouchableOpacity
+            style={s.retryBtn}
+            onPress={() => {
+              setLoading(true);
+              void load();
+            }}
+          >
+            <Text style={s.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={s.scroll}>
+          <View style={s.hero}>
+            <Text style={s.heroGreeting}>Welcome back.</Text>
+            <Text style={s.heroSubtitle}>
+              Your household queue, library, and stack health in one place.
+            </Text>
+            <HealthBadge summary={data.health_summary} />
+          </View>
+
+          <View style={s.section}>
+            <SectionHeader
+              icon="play-circle-outline"
+              title="Continue Watching"
+            />
+            {!data.continue_watching_enabled ? null : data.continue_watching_requires_link ? (
+              <InlineMessage
+                icon="person-circle-outline"
+                title="Link required"
+                body="Connect your Jellyfin account to unlock personalized resume items."
+              />
+            ) : data.continue_watching.length === 0 ? (
+              <InlineMessage
+                icon="sparkles-outline"
+                title="Nothing to resume"
+                body="Start watching something in Jellyfin and it will appear here."
+              />
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.posterRow}
+              >
+                {data.continue_watching.map((entry) => (
+                  <ContinueWatchingCard
+                    key={entry.item.id}
+                    entry={entry}
+                    onPress={() => {
+                      void handlePlay(entry.item.id);
+                    }}
+                  />
+                ))}
+              </ScrollView>
+            )}
+          </View>
+
+          <View style={s.section}>
+            <SectionHeader
+              icon="film-outline"
+              title="Recently Added"
+              href="/library"
+            />
+            {data.recently_added_requires_link ? (
+              <InlineMessage
+                icon="person-circle-outline"
+                title="Link required"
+                body="Browse & Play is link-gated in v1, so this row appears after you link a Jellyfin account."
+              />
+            ) : data.recently_added.length === 0 ? (
+              <InlineMessage
+                icon="film-outline"
+                title="No recent additions"
+                body="When new items land in Jellyfin, they will show up here."
+              />
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.posterRow}
+              >
+                {data.recently_added.map((item) => (
+                  <PosterCard
+                    key={item.id}
+                    item={item}
+                    onPress={() => {
+                      void handlePlay(item.id);
+                    }}
+                    badge={playingId === item.id ? "Opening…" : undefined}
+                  />
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
 
 const s = StyleSheet.create({
   container: {
@@ -266,14 +325,24 @@ const s = StyleSheet.create({
     color: colors.primary,
     letterSpacing: -0.5,
   },
+  topBarSubtitle: {
+    ...type.labelSm,
+    color: colors.onSurfaceVariant,
+  },
+  centered: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.gutter,
+    gap: spacing.sm,
+  },
   scroll: {
     padding: spacing.gutter,
-    gap: 32,
+    gap: spacing.xl,
     paddingBottom: spacing.xl,
   },
   hero: {
-    gap: 6,
-    paddingTop: 8,
+    gap: spacing.xs,
   },
   heroGreeting: {
     ...type.displayLg,
@@ -283,13 +352,11 @@ const s = StyleSheet.create({
     ...type.bodyLg,
     color: colors.onSurfaceVariant,
   },
-
-  // Health badge — shown only when any_unreachable is true
   healthBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     marginTop: spacing.base,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
@@ -302,18 +369,17 @@ const s = StyleSheet.create({
     ...type.labelSm,
     color: colors.statusUnreachable,
   },
-
   section: {
-    gap: 16,
+    gap: spacing.base,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   sectionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.base,
   },
   sectionTitle: {
@@ -324,51 +390,50 @@ const s = StyleSheet.create({
     ...type.labelMd,
     color: colors.primary,
   },
-
-  // Continue Watching placeholder card
-  linkedAccountCard: {
-    backgroundColor: colors.surfaceContainer,
+  infoCard: {
+    flexDirection: "row",
+    gap: spacing.base,
+    padding: spacing.md,
     borderRadius: radius.xl,
-    padding: spacing.gutter,
-    alignItems: 'center',
-    gap: spacing.sm,
+    backgroundColor: colors.surfaceContainerLow,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.outlineVariant,
   },
-  linkedAccountTitle: {
+  infoBody: {
+    flex: 1,
+    gap: 4,
+  },
+  infoTitle: {
     ...type.labelMd,
     color: colors.onSurface,
-    textAlign: 'center',
   },
-  linkedAccountBody: {
+  infoText: {
     ...type.bodyMd,
     color: colors.onSurfaceVariant,
-    textAlign: 'center',
   },
-
-  // Poster row
   posterRow: {
-    gap: 16,
-    paddingRight: spacing.gutter,
+    gap: spacing.base,
   },
   posterCard: {
-    width: 120,
-    gap: 8,
+    width: 148,
+    gap: spacing.xs,
+  },
+  continueCard: {
+    width: 148,
+    gap: spacing.sm,
   },
   posterImage: {
-    width: 120,
-    height: 180,
-    backgroundColor: colors.surfaceContainerHigh,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.outlineVariant,
+    width: 148,
+    height: 216,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceContainer,
   },
   posterImageFill: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   posterTitle: {
     ...type.labelMd,
@@ -376,59 +441,38 @@ const s = StyleSheet.create({
   },
   posterSubtitle: {
     ...type.labelSm,
-    color: colors.outline,
-  },
-
-  // Skeleton placeholders
-  posterSkeleton: {
-    backgroundColor: colors.surfaceContainerHigh,
-    opacity: 0.5,
-  },
-  skeletonTextLine: {
-    height: 12,
-    width: 90,
-    backgroundColor: colors.surfaceContainerHigh,
-    borderRadius: radius.sm,
-    opacity: 0.5,
-  },
-  skeletonTextShort: {
-    width: 50,
-  },
-
-  // Request card at end of row
-  posterCardAdd: {
-    width: 120,
-    height: 180,
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: colors.outlineVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  posterAddLabel: {
-    ...type.labelSm,
-    color: colors.outline,
-  },
-
-  // Empty / error inline states for Recently Added
-  emptyRow: {
-    paddingVertical: spacing.md,
-  },
-  emptyRowText: {
-    ...type.bodyMd,
     color: colors.onSurfaceVariant,
   },
-  inlineError: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
+  badge: {
+    alignSelf: "flex-start",
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: colors.surfaceContainerHigh,
   },
-  inlineErrorText: {
-    ...type.bodyMd,
-    color: colors.error,
+  badgeText: {
+    ...type.labelSm,
+    color: colors.onSurfaceVariant,
+  },
+  progressTrack: {
+    width: "100%",
+    height: 6,
+    backgroundColor: colors.surfaceContainerHigh,
+    borderRadius: radius.full,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: colors.primary,
+  },
+  retryBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: radius.full,
+  },
+  retryBtnText: {
+    ...type.labelMd,
+    color: colors.onPrimaryContainer,
   },
 });

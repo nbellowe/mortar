@@ -5,8 +5,8 @@
  * Spec: specs/features/home.md
  */
 
-import { api } from './client';
-import type { MediaItem } from '../types/plugin';
+import { api } from "./client";
+import type { ContinueWatchingItem, MediaItem } from "../types/plugin";
 
 export interface HealthSummary {
   any_unreachable: boolean;
@@ -16,6 +16,10 @@ export interface HealthSummary {
 
 export interface HomeResponse {
   recently_added: MediaItem[];
+  recently_added_requires_link: boolean;
+  continue_watching: ContinueWatchingItem[];
+  continue_watching_enabled: boolean;
+  continue_watching_requires_link: boolean;
   health_summary: HealthSummary;
 }
 
@@ -24,5 +28,5 @@ export interface HomeResponse {
  * No auto-polling — the home screen is not a live operational view.
  */
 export function getHome(signal?: AbortSignal): Promise<HomeResponse> {
-  return api.get<HomeResponse>('/api/v1/home', { signal });
+  return api.get<HomeResponse>("/api/v1/home", { signal });
 }

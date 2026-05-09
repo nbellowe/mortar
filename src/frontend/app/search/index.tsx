@@ -1,34 +1,53 @@
-/**
- * Search & Request screen.
- * Searches across request-capable plugins and lets users submit requests.
- * Spec: specs/features/requests.md
- */
-
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  Linking,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { searchMedia, submitRequest } from '../../api/requests';
-import { MediaItem } from '../../types/requests';
-import { colors, radius, spacing, type } from '@/theme/tokens';
+import { playLibraryItem } from "../../api/library";
+import { searchMedia, submitRequest } from "../../api/requests";
+import { useAuth } from "../../components/auth-context";
+import type { LibraryMatch, MediaItem, Request } from "../../types/plugin";
+import { colors, radius, spacing, type } from "@/theme/tokens";
 
-const TYPE_LABEL: Record<MediaItem['type'], string> = {
-  movie: 'Movies',
-  show: 'Shows',
-  audiobook: 'Audiobooks',
-  ebook: 'Ebooks',
+const TYPE_LABEL: Record<MediaItem["type"], string> = {
+  movie: "Movies",
+  show: "Shows",
+  audiobook: "Audiobooks",
+  ebook: "Ebooks",
 };
 
-function PosterPlaceholder() {
+type FeedbackMap = Record<string, string>;
+
+function searchKey(item: MediaItem): string {
+  if (item.tmdb_id) return `tmdb:${item.tmdb_id}`;
+  if (item.imdb_id) return `imdb:${item.imdb_id}`;
+  if (item.tvdb_id) return `tvdb:${item.tvdb_id}`;
+  if (item.isbn) return `isbn:${item.isbn}`;
+  if (item.asin) return `asin:${item.asin}`;
+  return `id:${item.id}`;
+}
+
+function Poster({ url }: { url?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (url && !failed) {
+    return (
+      <Image
+        source={{ uri: url }}
+        style={s.poster}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
   return (
     <View style={s.posterPlaceholder}>
       <Ionicons name="film-outline" size={24} color={colors.outline} />
@@ -36,90 +55,172 @@ function PosterPlaceholder() {
   );
 }
 
-function Poster({ url }: { url?: string }) {
-  if (url) {
-    return <Image source={{ uri: url }} style={s.poster} resizeMode="cover" />;
+function StatusChip({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={[s.statusChip, { borderColor: color }]}>
+      <Text style={[s.statusChipText, { color }]}>{label}</Text>
+    </View>
+  );
+}
+
+function FailedPluginsBanner({ plugins }: { plugins: string[] }) {
+  if (plugins.length === 0) return null;
+  return (
+    <View style={s.warningBanner}>
+      <Ionicons
+        name="warning-outline"
+        size={16}
+        color={colors.statusDegraded}
+      />
+      <Text style={s.warningBannerText}>
+        Search partial results: {plugins.join(", ")} unavailable.
+      </Text>
+    </View>
+  );
+}
+
+function actionStateForItem(
+  item: MediaItem,
+  matches: Map<string, LibraryMatch>,
+  requests: Map<string, Request>,
+) {
+  const key = searchKey(item);
+  const match = matches.get(key);
+  const request = requests.get(key);
+
+  if (match) {
+    return { kind: "available" as const, label: "Open in Jellyfin", match };
   }
-  return <PosterPlaceholder />;
-}
-
-interface RequestButtonProps {
-  item: MediaItem;
-  onDone: (id: string, result: 'ok' | 'error', msg: string) => void;
-}
-
-function RequestButton({ item, onDone }: RequestButtonProps) {
-  const [inFlight, setInFlight] = useState(false);
-
-  const handlePress = useCallback(async () => {
-    setInFlight(true);
-    try {
-      await submitRequest(item);
-      onDone(item.id, 'ok', 'Requested');
-    } catch (err) {
-      onDone(item.id, 'error', err instanceof Error ? err.message : 'Failed');
-    } finally {
-      setInFlight(false);
+  if (request) {
+    if (
+      request.status === "pending" ||
+      request.status === "approved" ||
+      request.status === "available"
+    ) {
+      return {
+        kind: "requested" as const,
+        label: request.status.charAt(0).toUpperCase() + request.status.slice(1),
+        request,
+      };
     }
-  }, [item, onDone]);
+    if (request.status === "failed" || request.status === "declined") {
+      return { kind: "request" as const, label: "Retry" };
+    }
+  }
+  return { kind: "request" as const, label: "Request" };
+}
+
+function ActionButton({
+  item,
+  actionState,
+  feedback,
+  requesting,
+  onRequest,
+  onPlay,
+}: {
+  item: MediaItem;
+  actionState: ReturnType<typeof actionStateForItem>;
+  feedback?: string;
+  requesting: boolean;
+  onRequest: (item: MediaItem) => void;
+  onPlay: (itemId: string) => void;
+}) {
+  if (feedback) {
+    return <StatusChip color={colors.statusHealthy} label={feedback} />;
+  }
+
+  if (actionState.kind === "available") {
+    return (
+      <TouchableOpacity
+        style={s.availableBtn}
+        onPress={() => onPlay(actionState.match.item.id)}
+      >
+        <Ionicons
+          name="play-circle-outline"
+          size={16}
+          color={colors.onPrimaryContainer}
+        />
+        <Text style={s.availableBtnText}>{actionState.label}</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  if (actionState.kind === "requested") {
+    return (
+      <StatusChip color={colors.statusDegraded} label={actionState.label} />
+    );
+  }
+
+  if (requesting) {
+    return <ActivityIndicator size="small" color={colors.primary} />;
+  }
 
   return (
-    <TouchableOpacity
-      style={[s.requestBtn, inFlight && s.requestBtnDisabled]}
-      onPress={() => { void handlePress(); }}
-      disabled={inFlight}
-      accessibilityLabel={`Request ${item.title}`}
-    >
-      {inFlight ? (
-        <ActivityIndicator size="small" color={colors.onPrimaryContainer} />
-      ) : (
-        <>
-          <Ionicons name="add-circle-outline" size={16} color={colors.onPrimaryContainer} />
-          <Text style={s.requestBtnText}>Request</Text>
-        </>
-      )}
+    <TouchableOpacity style={s.requestBtn} onPress={() => onRequest(item)}>
+      <Ionicons
+        name="add-circle-outline"
+        size={16}
+        color={colors.onPrimaryContainer}
+      />
+      <Text style={s.requestBtnText}>{actionState.label}</Text>
     </TouchableOpacity>
   );
 }
 
-interface MediaCardProps {
+function MediaCard({
+  item,
+  matches,
+  requests,
+  feedback,
+  requesting,
+  onRequest,
+  onPlay,
+}: {
   item: MediaItem;
-  feedback: { result: 'ok' | 'error'; message: string } | undefined;
-  onRequestDone: (id: string, result: 'ok' | 'error', msg: string) => void;
-}
+  matches: Map<string, LibraryMatch>;
+  requests: Map<string, Request>;
+  feedback?: string;
+  requesting: boolean;
+  onRequest: (item: MediaItem) => void;
+  onPlay: (itemId: string) => void;
+}) {
+  const actionState = actionStateForItem(item, matches, requests);
 
-function MediaCard({ item, feedback, onRequestDone }: MediaCardProps) {
   return (
     <View style={s.card}>
       <Poster url={item.poster_url} />
       <View style={s.cardMeta}>
-        <Text style={s.cardYear}>{item.year ?? '—'}</Text>
+        <Text style={s.cardYear}>{item.year ?? "—"}</Text>
       </View>
       <View style={s.cardBody}>
-        <Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
-        {feedback ? (
-          <View style={[s.statusChip, feedback.result === 'ok' ? s.chipAvailable : s.chipError]}>
-            <Text style={[s.statusChipText, feedback.result === 'ok' ? s.chipTextAvailable : s.chipTextError]}>
-              {feedback.result === 'ok' ? 'Requested' : feedback.message}
-            </Text>
-          </View>
-        ) : (
-          <RequestButton item={item} onDone={onRequestDone} />
-        )}
+        <Text style={s.cardTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <ActionButton
+          item={item}
+          actionState={actionState}
+          feedback={feedback}
+          requesting={requesting}
+          onRequest={onRequest}
+          onPlay={onPlay}
+        />
       </View>
     </View>
   );
 }
 
-type FeedbackMap = Record<string, { result: 'ok' | 'error'; message: string }>;
-
 export default function SearchScreen() {
-  const [query, setQuery] = useState('');
+  const { user } = useAuth();
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<MediaItem[]>([]);
+  const [failedPlugins, setFailedPlugins] = useState<string[]>([]);
+  const [existingRequests, setExistingRequests] = useState<Request[]>([]);
+  const [availableMatches, setAvailableMatches] = useState<LibraryMatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackMap>({});
+  const [requestingId, setRequestingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const handleSearch = useCallback(async (q: string) => {
@@ -137,41 +238,87 @@ export default function SearchScreen() {
 
     try {
       const data = await searchMedia(trimmed, controller.signal);
-      setResults(data);
+      setResults(data.items);
+      setFailedPlugins(data.failed_plugins);
+      setExistingRequests(data.existing_requests);
+      setAvailableMatches(data.available_matches);
     } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-      setError(err instanceof Error ? err.message : 'Search failed');
+      if ((err as Error).name === "AbortError") return;
+      setError(err instanceof Error ? err.message : "Search failed");
       setResults([]);
+      setFailedPlugins([]);
+      setExistingRequests([]);
+      setAvailableMatches([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const handleRequestDone = useCallback(
-    (id: string, result: 'ok' | 'error', message: string) => {
-      setFeedback((prev) => ({ ...prev, [id]: { result, message } }));
-    },
-    [],
-  );
+  const matchesMap = useMemo(() => {
+    const map = new Map<string, LibraryMatch>();
+    for (const match of availableMatches) {
+      map.set(searchKey(match.item), match);
+    }
+    return map;
+  }, [availableMatches]);
+
+  const requestMap = useMemo(() => {
+    const map = new Map<string, Request>();
+    for (const request of existingRequests) {
+      map.set(searchKey(request.item), request);
+    }
+    return map;
+  }, [existingRequests]);
 
   const grouped = useMemo(() => {
-    const groups: { type: MediaItem['type']; label: string; items: MediaItem[] }[] = [];
-    const seen = new Map<MediaItem['type'], MediaItem[]>();
+    const groups: {
+      type: MediaItem["type"];
+      label: string;
+      items: MediaItem[];
+    }[] = [];
+    const seen = new Map<MediaItem["type"], MediaItem[]>();
     for (const item of results) {
       if (!seen.has(item.type)) seen.set(item.type, []);
       seen.get(item.type)!.push(item);
     }
-    for (const [t, items] of seen) {
-      groups.push({ type: t, label: TYPE_LABEL[t], items });
+    for (const [kind, items] of seen) {
+      groups.push({ type: kind, label: TYPE_LABEL[kind], items });
     }
     return groups;
   }, [results]);
+
+  const handleRequest = useCallback(async (item: MediaItem) => {
+    if (requestingId != null) return;
+    setRequestingId(item.id);
+    try {
+      const created = await submitRequest(item);
+      setFeedback((prev) => ({ ...prev, [item.id]: "Requested" }));
+      setExistingRequests((prev) => [created, ...prev]);
+    } catch (err) {
+      setFeedback((prev) => ({
+        ...prev,
+        [item.id]: err instanceof Error ? err.message : "Failed",
+      }));
+    } finally {
+      setRequestingId(null);
+    }
+  }, [requestingId, user]);
+
+  const handlePlay = useCallback(async (itemId: string) => {
+    const result = await playLibraryItem(itemId);
+    await Linking.openURL(result.url);
+  }, []);
 
   return (
     <View style={s.container}>
       <View style={s.topBar}>
         <View style={s.searchBar}>
-          <Ionicons name="search-outline" size={18} color={colors.onSurfaceVariant} style={s.searchIcon} />
+          <Ionicons
+            name="search-outline"
+            size={18}
+            color={colors.onSurfaceVariant}
+            style={s.searchIcon}
+          />
           <TextInput
             style={s.searchInput}
             value={query}
@@ -179,19 +326,23 @@ export default function SearchScreen() {
             placeholder="Search movies, shows, audiobooks…"
             placeholderTextColor={colors.outline}
             returnKeyType="search"
-            onSubmitEditing={() => { void handleSearch(query); }}
+            onSubmitEditing={() => {
+              void handleSearch(query);
+            }}
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')} style={s.clearBtn}>
+          {query.length > 0 ? (
+            <TouchableOpacity onPress={() => setQuery("")} style={s.clearBtn}>
               <Ionicons name="close-circle" size={18} color={colors.outline} />
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
         <TouchableOpacity
           style={[s.searchSubmit, !query.trim() && s.searchSubmitDisabled]}
-          onPress={() => { void handleSearch(query); }}
+          onPress={() => {
+            void handleSearch(query);
+          }}
           disabled={!query.trim() || loading}
         >
           <Text style={s.searchSubmitText}>Search</Text>
@@ -208,7 +359,12 @@ export default function SearchScreen() {
             <Ionicons name="warning-outline" size={20} color={colors.error} />
             <Text style={s.errorText}>{error}</Text>
           </View>
-          <TouchableOpacity style={s.retryBtn} onPress={() => { void handleSearch(query); }}>
+          <TouchableOpacity
+            style={s.retryBtn}
+            onPress={() => {
+              void handleSearch(query);
+            }}
+          >
             <Text style={s.retryBtnText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -216,7 +372,9 @@ export default function SearchScreen() {
         <View style={s.centered}>
           <Ionicons name="search" size={48} color={colors.outlineVariant} />
           <Text style={s.emptyTitle}>Search your media stack</Text>
-          <Text style={s.emptyBody}>Find movies, shows, and audiobooks to request.</Text>
+          <Text style={s.emptyBody}>
+            Find movies, shows, audiobooks, and books in one place.
+          </Text>
         </View>
       ) : grouped.length === 0 ? (
         <View style={s.centered}>
@@ -227,6 +385,7 @@ export default function SearchScreen() {
         <FlatList
           data={grouped}
           keyExtractor={(item) => item.type}
+          ListHeaderComponent={<FailedPluginsBanner plugins={failedPlugins} />}
           renderItem={({ item: group }) => (
             <View style={s.group}>
               <View style={s.groupHeader}>
@@ -244,8 +403,14 @@ export default function SearchScreen() {
                 renderItem={({ item }) => (
                   <MediaCard
                     item={item}
+                    matches={matchesMap}
+                    requests={requestMap}
                     feedback={feedback[item.id]}
-                    onRequestDone={handleRequestDone}
+                    requesting={requestingId === item.id}
+                    onRequest={(i) => { void handleRequest(i); }}
+                    onPlay={(itemId) => {
+                      void handlePlay(itemId);
+                    }}
                   />
                 )}
               />
@@ -258,54 +423,48 @@ export default function SearchScreen() {
   );
 }
 
-const POSTER_W = 120;
-const POSTER_H = 180;
-
 const s = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.base,
     paddingHorizontal: spacing.gutter,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.outlineVariant,
+    backgroundColor: colors.surface,
   },
   searchBar: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceContainerHigh,
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: radius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.outlineVariant,
-    paddingHorizontal: 12,
-    height: 44,
+    backgroundColor: colors.surfaceContainer,
+    paddingHorizontal: spacing.sm,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: spacing.xs,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
     color: colors.onSurface,
+    paddingVertical: 10,
   },
   clearBtn: {
     padding: 4,
   },
   searchSubmit: {
+    paddingHorizontal: spacing.md,
     paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: colors.primaryContainer,
     borderRadius: radius.full,
+    backgroundColor: colors.primaryContainer,
   },
   searchSubmitDisabled: {
-    opacity: 0.5,
+    opacity: 0.55,
   },
   searchSubmitText: {
     ...type.labelMd,
@@ -313,14 +472,32 @@ const s = StyleSheet.create({
   },
   centered: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: spacing.gutter,
     gap: spacing.sm,
   },
+  warningBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.base,
+    marginHorizontal: spacing.gutter,
+    marginTop: spacing.base,
+    marginBottom: spacing.base,
+    padding: spacing.sm,
+    borderRadius: radius.lg,
+    backgroundColor: `${colors.statusDegraded}22`,
+    borderWidth: 1,
+    borderColor: `${colors.statusDegraded}44`,
+  },
+  warningBannerText: {
+    ...type.labelSm,
+    color: colors.onSurface,
+    flex: 1,
+  },
   errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.base,
     backgroundColor: colors.errorContainer,
     paddingHorizontal: spacing.md,
@@ -345,122 +522,115 @@ const s = StyleSheet.create({
   emptyTitle: {
     ...type.headlineMd,
     color: colors.onSurface,
-    textAlign: 'center',
+    textAlign: "center",
   },
   emptyBody: {
     ...type.bodyMd,
     color: colors.onSurfaceVariant,
-    textAlign: 'center',
+    textAlign: "center",
   },
   listContent: {
-    paddingVertical: spacing.gutter,
-    gap: 32,
+    paddingBottom: spacing.xl,
   },
   group: {
-    gap: 16,
+    gap: spacing.base,
+    marginTop: spacing.base,
   },
   groupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.gutter,
   },
   groupTitle: {
-    ...type.headlineLg,
+    ...type.headlineMd,
     color: colors.onSurface,
   },
   groupCount: {
-    backgroundColor: colors.surfaceContainerHigh,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    minWidth: 28,
+    height: 28,
     borderRadius: radius.full,
+    backgroundColor: colors.surfaceContainerHigh,
+    alignItems: "center",
+    justifyContent: "center",
   },
   groupCountText: {
-    ...type.labelSm,
+    ...type.labelMd,
     color: colors.onSurfaceVariant,
   },
   cardRow: {
+    gap: spacing.base,
     paddingHorizontal: spacing.gutter,
-    gap: spacing.md,
   },
   card: {
-    width: POSTER_W,
-    gap: 8,
+    width: 176,
+    gap: spacing.xs,
   },
   poster: {
-    width: POSTER_W,
-    height: POSTER_H,
-    borderRadius: radius.lg,
+    width: 176,
+    height: 250,
+    borderRadius: radius.xl,
   },
   posterPlaceholder: {
-    width: POSTER_W,
-    height: POSTER_H,
-    backgroundColor: colors.surfaceContainerHigh,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.outlineVariant,
+    width: 176,
+    height: 250,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cardMeta: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: `${colors.surface}dd`,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   cardYear: {
     ...type.labelSm,
-    color: colors.onSurface,
+    color: colors.onSurfaceVariant,
   },
   cardBody: {
-    gap: 8,
+    gap: spacing.xs,
   },
   cardTitle: {
     ...type.labelMd,
     color: colors.onSurface,
   },
-  requestBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    backgroundColor: colors.primaryContainer,
-    borderRadius: radius.md,
+  statusChip: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    borderWidth: 1,
   },
-  requestBtnDisabled: {
-    opacity: 0.6,
+  statusChipText: {
+    ...type.labelSm,
+  },
+  requestBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    backgroundColor: colors.primaryContainer,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderRadius: radius.full,
   },
   requestBtnText: {
     ...type.labelMd,
     color: colors.onPrimaryContainer,
   },
-  statusChip: {
+  availableBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    backgroundColor: colors.primaryContainer,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: radius.md,
-    alignItems: 'center',
+    borderRadius: radius.full,
   },
-  statusChipText: {
-    ...type.labelSm,
-  },
-  chipAvailable: {
-    backgroundColor: `${colors.tertiary}22`,
-    borderWidth: 1,
-    borderColor: `${colors.tertiary}44`,
-  },
-  chipTextAvailable: {
-    color: colors.tertiary,
-  },
-  chipError: {
-    backgroundColor: `${colors.error}22`,
-    borderWidth: 1,
-    borderColor: `${colors.error}44`,
-  },
-  chipTextError: {
-    color: colors.error,
+  availableBtnText: {
+    ...type.labelMd,
+    color: colors.onPrimaryContainer,
   },
 });

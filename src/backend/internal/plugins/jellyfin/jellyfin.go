@@ -31,6 +31,7 @@ import (
 type Plugin struct {
 	id            string
 	baseURL       string
+	externalURL   string // browser-accessible URL for images and play links; falls back to baseURL
 	apiKey        string
 	defaultUserID string
 	httpClient    *http.Client
@@ -51,9 +52,14 @@ func New(cfg config.PluginConfig) (plugins.Plugin, error) {
 		return nil, fmt.Errorf("jellyfin: api_key is required")
 	}
 	baseURL := strings.TrimRight(cfg.URL, "/")
+	externalURL := strings.TrimRight(cfg.ExternalURL, "/")
+	if externalURL == "" {
+		externalURL = baseURL
+	}
 	return &Plugin{
 		id:            cfg.ID,
 		baseURL:       baseURL,
+		externalURL:   externalURL,
 		apiKey:        cfg.APIKey,
 		defaultUserID: cfg.Username,
 		httpClient:    &http.Client{Timeout: 10 * time.Second},
@@ -307,7 +313,7 @@ func (p *Plugin) GetPlayURL(item plugins.MediaItem, user plugins.MortarUser) (st
 
 	jellyfinID := item.ExternalID
 	playURL := fmt.Sprintf("%s/web/index.html#!/details?id=%s&serverId=%s",
-		p.baseURL, url.QueryEscape(jellyfinID), url.QueryEscape(serverID))
+		p.externalURL, url.QueryEscape(jellyfinID), url.QueryEscape(serverID))
 	return playURL, nil
 }
 
@@ -505,9 +511,9 @@ func (p *Plugin) toMediaItem(ji jellyfinItem) plugins.MediaItem {
 		Genres:     ji.Genres,
 	}
 
-	// Poster URL
+	// Poster URL — use the browser-accessible externalURL so images load in the client.
 	if _, ok := ji.ImageTags["Primary"]; ok {
-		posterURL := fmt.Sprintf("%s/Items/%s/Images/Primary", p.baseURL, ji.ID)
+		posterURL := fmt.Sprintf("%s/Items/%s/Images/Primary", p.externalURL, ji.ID)
 		item.PosterURL = &posterURL
 	}
 

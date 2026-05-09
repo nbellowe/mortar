@@ -117,6 +117,35 @@ npx expo start --ios
 npx expo start --android
 ```
 
+### Kubernetes test cluster
+
+A homelab cluster is available at `https://homelab:6443` for integration testing.
+Kubeconfig: `~/src/homelab/kubeconfig.yml` (pass as `KUBECONFIG=~/src/homelab/kubeconfig.yml`).
+
+Ad-hoc test deploys use the `mortar-test` namespace, which is separate from the
+Argo CD-managed `media` namespace. Manifests live in `k8s/test/`.
+
+**First-time setup:** `k8s/test/secret.yaml` is gitignored. It already exists with
+real API keys from the homelab SOPS store. If it's missing, copy
+`k8s/test/secret.yaml.example` and decrypt the SOPS file to fill in values:
+
+```bash
+SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt \
+  sops -d ~/src/homelab/kubernetes/apps/media/media-secrets/secret.sops.yaml
+```
+
+**Deploy** using the `/k8s-test` skill (builds, pushes, applies, port-forwards):
+
+```
+/k8s-test [image-tag]   # defaults to current git SHA
+```
+
+**Tear down:**
+
+```bash
+KUBECONFIG=~/src/homelab/kubeconfig.yml kubectl delete namespace mortar-test
+```
+
 ### Building for distribution
 
 ```bash

@@ -11,6 +11,8 @@ import (
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
 )
 
+const activityFanOutTimeout = 10 * time.Second
+
 // activityResponse is the JSON body returned by GET /api/v1/activity.
 type activityResponse struct {
 	Events        []plugins.ActivityEvent `json:"events"`
@@ -58,7 +60,20 @@ func (h *handler) handleActivity(w http.ResponseWriter, r *http.Request) {
 		}(ar, manifest.DisplayName)
 	}
 
-	wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(activityFanOutTimeout):
+	}
+
+	user := currentUser(r)
+	if user != nil {
+		events = h.filterVisibleEvents(events, *user)
+	}
 
 	// Sort events by timestamp descending; events with unparseable timestamps
 	// sort last.
@@ -77,17 +92,45 @@ func (h *handler) handleActivity(w http.ResponseWriter, r *http.Request) {
 		return ti.After(tj)
 	})
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	if events == nil {
 		events = []plugins.ActivityEvent{}
 	}
 	if failedPlugins == nil {
 		failedPlugins = []string{}
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(activityResponse{
 		Events:        events,
 		FailedPlugins: failedPlugins,
 	})
+}
+
+func (h *handler) filterVisibleEvents(events []plugins.ActivityEvent, user plugins.MortarUser) []plugins.ActivityEvent {
+	filtered := make([]plugins.ActivityEvent, 0, len(events))
+	for _, event := range events {
+		switch event.Visibility {
+		case plugins.ActivityVisibilityAllUsers:
+			filtered = append(filtered, event)
+		case plugins.ActivityVisibilityAdminOnly:
+			if user.Role == "admin" {
+				filtered = append(filtered, event)
+			}
+		case plugins.ActivityVisibilityRequesterAndAdmin:
+			if user.Role == "admin" {
+				filtered = append(filtered, event)
+				continue
+			}
+			if event.ActorUserID == nil || h.store == nil {
+				continue
+			}
+			mortarUserID, err := h.store.LookupMortarUserIDByExternalAccount(event.SourcePlugin, *event.ActorUserID)
+			if err == nil && mortarUserID == user.ID {
+				cloned := event
+				cloned.ActorUserID = &mortarUserID
+				filtered = append(filtered, cloned)
+			}
+		}
+	}
+	return filtered
 }

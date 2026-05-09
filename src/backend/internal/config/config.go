@@ -17,6 +17,7 @@ type Config struct {
 	Server  ServerConfig   `yaml:"server"`
 	Plugins []PluginConfig `yaml:"plugins"`
 	Routing RoutingConfig  `yaml:"routing"`
+	Users   []UserConfig   `yaml:"users,omitempty"`
 }
 
 // ServerConfig holds HTTP server settings.
@@ -28,12 +29,28 @@ type ServerConfig struct {
 // PluginConfig holds the configuration for a single plugin instance.
 // Secrets (api_key, password, etc.) should use ${VAR} interpolation.
 type PluginConfig struct {
-	ID       string `yaml:"id"`
-	Type     string `yaml:"type"`
-	URL      string `yaml:"url"`
-	APIKey   string `yaml:"api_key,omitempty"`
-	Username string `yaml:"username,omitempty"`
-	Password string `yaml:"password,omitempty"`
+	ID          string `yaml:"id"`
+	Type        string `yaml:"type"`
+	URL         string `yaml:"url"`
+	ExternalURL string `yaml:"external_url,omitempty"`
+	APIKey      string `yaml:"api_key,omitempty"`
+	Username    string `yaml:"username,omitempty"`
+	Password    string `yaml:"password,omitempty"`
+}
+
+// UserConfig bootstraps a Mortar user and any upstream account links.
+type UserConfig struct {
+	Username         string                  `yaml:"username"`
+	Password         string                  `yaml:"password"`
+	Role             string                  `yaml:"role"`
+	ExternalAccounts []ExternalAccountConfig `yaml:"external_accounts,omitempty"`
+}
+
+// ExternalAccountConfig seeds a user's per-plugin upstream identity link.
+type ExternalAccountConfig struct {
+	PluginID         string `yaml:"plugin_id"`
+	ExternalUserID   string `yaml:"external_user_id"`
+	ExternalUsername string `yaml:"external_username,omitempty"`
 }
 
 // RoutingConfig holds request routing policy as resolved at startup.
@@ -112,6 +129,23 @@ func validate(cfg *Config) error {
 		seen[p.ID] = true
 	}
 
+	seenUsers := make(map[string]bool, len(cfg.Users))
+	for _, u := range cfg.Users {
+		if strings.TrimSpace(u.Username) == "" {
+			return fmt.Errorf("config: user entry is missing a username")
+		}
+		if strings.TrimSpace(u.Password) == "" {
+			return fmt.Errorf("config: user %q is missing a password", u.Username)
+		}
+		if u.Role != "admin" && u.Role != "user" {
+			return fmt.Errorf("config: user %q has invalid role %q", u.Username, u.Role)
+		}
+		if seenUsers[u.Username] {
+			return fmt.Errorf("config: duplicate username %q", u.Username)
+		}
+		seenUsers[u.Username] = true
+	}
+
 	pluginIDs := make(map[string]bool, len(cfg.Plugins))
 	for _, p := range cfg.Plugins {
 		pluginIDs[p.ID] = true
@@ -123,6 +157,19 @@ func validate(cfg *Config) error {
 	} {
 		if id != "" && !pluginIDs[id] {
 			return fmt.Errorf("config: %s references unknown plugin id %q", cap, id)
+		}
+	}
+	for _, u := range cfg.Users {
+		for _, ext := range u.ExternalAccounts {
+			if strings.TrimSpace(ext.PluginID) == "" {
+				return fmt.Errorf("config: user %q has an external account link with no plugin_id", u.Username)
+			}
+			if strings.TrimSpace(ext.ExternalUserID) == "" {
+				return fmt.Errorf("config: user %q has an external account link with no external_user_id", u.Username)
+			}
+			if !pluginIDs[ext.PluginID] {
+				return fmt.Errorf("config: user %q references unknown plugin id %q in external_accounts", u.Username, ext.PluginID)
+			}
 		}
 	}
 

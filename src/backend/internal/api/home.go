@@ -1,78 +1,73 @@
-// Package api — home dashboard endpoint.
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
 )
 
-// homeHealthSummary is the health sub-object in the home response.
 type homeHealthSummary struct {
-	AnyUnreachable  bool `json:"any_unreachable"`
-	Total           int  `json:"total"`
+	AnyUnreachable   bool `json:"any_unreachable"`
+	Total            int  `json:"total"`
 	UnreachableCount int  `json:"unreachable_count"`
 }
 
-// homeResponse is the JSON body returned by GET /api/v1/home.
 type homeResponse struct {
-	RecentlyAdded []plugins.MediaItem `json:"recently_added"`
-	HealthSummary homeHealthSummary   `json:"health_summary"`
+	RecentlyAdded                []plugins.MediaItem            `json:"recently_added"`
+	RecentlyAddedRequiresLink    bool                           `json:"recently_added_requires_link"`
+	ContinueWatching             []plugins.ContinueWatchingItem `json:"continue_watching"`
+	ContinueWatchingEnabled      bool                           `json:"continue_watching_enabled"`
+	ContinueWatchingRequiresLink bool                           `json:"continue_watching_requires_link"`
+	HealthSummary                homeHealthSummary              `json:"health_summary"`
 }
 
-// handleHome handles GET /api/v1/home.
-// It assembles the home dashboard: recently-added items from the first
-// LibraryBrowser plugin and a health summary across all plugins.
-// Continue watching is omitted until auth is implemented.
-// Always returns HTTP 200.
-func (h *handler) handleHome(w http.ResponseWriter, _ *http.Request) {
-	all := h.registry.All()
-
-	// Recently added: use the first LibraryBrowser plugin found.
-	var recentlyAdded []plugins.MediaItem
-	for _, p := range all {
-		lb, ok := p.(plugins.LibraryBrowser)
-		if !ok {
-			continue
-		}
-		pageSize := 10
-		sort := "added"
-		result, err := lb.Browse(plugins.BrowseOptions{
-			Sort:     &sort,
-			PageSize: &pageSize,
-		})
-		if err == nil {
-			recentlyAdded = result.Items
-		}
-		// Use only the first browser plugin regardless of success.
-		break
-	}
-	if recentlyAdded == nil {
-		recentlyAdded = []plugins.MediaItem{}
-	}
-
-	// Health summary: check all plugins.
-	total := len(all)
-	unreachableCount := 0
-	for _, p := range all {
-		manifest := p.Manifest()
-		entry := buildHealthEntry(manifest, p)
-		if entry.Status == "unreachable" {
-			unreachableCount++
-		}
-	}
-
+func (h *handler) handleHome(w http.ResponseWriter, r *http.Request) {
 	resp := homeResponse{
-		RecentlyAdded: recentlyAdded,
-		HealthSummary: homeHealthSummary{
-			AnyUnreachable:  unreachableCount > 0,
-			Total:           total,
-			UnreachableCount: unreachableCount,
-		},
+		RecentlyAdded:    []plugins.MediaItem{},
+		ContinueWatching: []plugins.ContinueWatchingItem{},
+		HealthSummary:    h.homeHealthSummary(),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(resp)
+	user := currentUser(r)
+
+	if manifest, library, ok := firstLibraryBrowser(h.registry); ok {
+		if h.enforceExternalLinks() && !userHasExternalLink(user, manifest.ID) {
+			resp.RecentlyAddedRequiresLink = true
+		} else {
+			pageSize := 10
+			sortBy := "added"
+			if result, err := library.Browse(plugins.BrowseOptions{
+				Sort:     &sortBy,
+				PageSize: &pageSize,
+			}); err == nil {
+				resp.RecentlyAdded = result.Items
+			}
+		}
+	}
+
+	if manifest, reader, ok := firstContinueWatchingPlugin(h.registry); ok {
+		resp.ContinueWatchingEnabled = true
+		if h.enforceExternalLinks() && !userHasExternalLink(user, manifest.ID) {
+			resp.ContinueWatchingRequiresLink = true
+		} else if user != nil {
+			limit := 10
+			if items, err := reader.GetContinueWatching(*user, plugins.ContinueWatchingOptions{Limit: &limit}); err == nil {
+				resp.ContinueWatching = items
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *handler) homeHealthSummary() homeHealthSummary {
+	entries := h.health.list()
+	summary := homeHealthSummary{Total: len(entries)}
+	for _, entry := range entries {
+		if entry.Status == "unreachable" {
+			summary.UnreachableCount++
+		}
+	}
+	summary.AnyUnreachable = summary.UnreachableCount > 0
+	return summary
 }

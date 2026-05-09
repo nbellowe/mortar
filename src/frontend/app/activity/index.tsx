@@ -193,7 +193,7 @@ export default function ActivityScreen() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const data = await getActivity();
+      const data = await getActivity(undefined, controller.signal);
       setEvents(data.events);
       setFailedPlugins(data.failed_plugins);
       setNow(Date.now());

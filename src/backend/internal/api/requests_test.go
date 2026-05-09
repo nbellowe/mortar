@@ -36,6 +36,18 @@ func defaultRequesterPlugin() *mockPluginWithRequester {
 	}
 }
 
+type searchResp struct {
+	Items            []plugins.MediaItem    `json:"items"`
+	FailedPlugins    []string               `json:"failed_plugins"`
+	ExistingRequests []plugins.Request      `json:"existing_requests"`
+	AvailableMatches []plugins.LibraryMatch `json:"available_matches"`
+}
+
+type requestsResp struct {
+	Items      []plugins.Request `json:"items"`
+	ReviewURLs map[string]string `json:"review_urls"`
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/v1/search
 // ---------------------------------------------------------------------------
@@ -73,19 +85,22 @@ func TestSearch_ReturnsTwoResults(t *testing.T) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	var items []plugins.MediaItem
-	if err := json.Unmarshal(body, &items); err != nil {
+	var payload searchResp
+	if err := json.Unmarshal(body, &payload); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	if len(items) != 2 {
-		t.Fatalf("expected 2 items, got %d", len(items))
+	if len(payload.Items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(payload.Items))
 	}
-	if items[0].Title != "The Avengers" {
-		t.Errorf("items[0].Title: got %q, want The Avengers", items[0].Title)
+	if payload.Items[0].Title != "The Avengers" {
+		t.Errorf("items[0].Title: got %q, want The Avengers", payload.Items[0].Title)
 	}
-	if items[1].Title != "Avengers: Endgame" {
-		t.Errorf("items[1].Title: got %q, want Avengers: Endgame", items[1].Title)
+	if payload.Items[1].Title != "Avengers: Endgame" {
+		t.Errorf("items[1].Title: got %q, want Avengers: Endgame", payload.Items[1].Title)
+	}
+	if payload.FailedPlugins == nil {
+		t.Fatal("expected failed_plugins to be a non-nil slice")
 	}
 }
 
@@ -158,19 +173,19 @@ func TestListRequests_ReturnsResults(t *testing.T) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	var reqs []plugins.Request
-	if err := json.Unmarshal(body, &reqs); err != nil {
+	var payload requestsResp
+	if err := json.Unmarshal(body, &payload); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	if len(reqs) != 1 {
-		t.Fatalf("expected 1 request, got %d", len(reqs))
+	if len(payload.Items) != 1 {
+		t.Fatalf("expected 1 request, got %d", len(payload.Items))
 	}
-	if reqs[0].ID != "jellyseerr:10" {
-		t.Errorf("ID: got %q, want jellyseerr:10", reqs[0].ID)
+	if payload.Items[0].ID != "jellyseerr:10" {
+		t.Errorf("ID: got %q, want jellyseerr:10", payload.Items[0].ID)
 	}
-	if reqs[0].Status != plugins.RequestStatusPending {
-		t.Errorf("Status: got %q, want pending", reqs[0].Status)
+	if payload.Items[0].Status != plugins.RequestStatusPending {
+		t.Errorf("Status: got %q, want pending", payload.Items[0].Status)
 	}
 }
 
@@ -191,15 +206,15 @@ func TestListRequests_EmptyList(t *testing.T) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	var reqs []plugins.Request
-	if err := json.Unmarshal(body, &reqs); err != nil {
+	var payload requestsResp
+	if err := json.Unmarshal(body, &payload); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if reqs == nil {
+	if payload.Items == nil {
 		t.Error("expected non-nil (empty) slice, got null JSON")
 	}
-	if len(reqs) != 0 {
-		t.Errorf("expected 0 requests, got %d", len(reqs))
+	if len(payload.Items) != 0 {
+		t.Errorf("expected 0 requests, got %d", len(payload.Items))
 	}
 }
 

@@ -24,6 +24,9 @@ web-build/
 config.yaml
 config.local.yaml
 
+# Kubernetes test secrets (keep example, ignore real)
+k8s/test/secret.yaml
+
 # OS
 .DS_Store
 Thumbs.db

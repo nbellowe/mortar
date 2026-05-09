@@ -13,6 +13,6 @@ export interface DownloadsResponse {
   failed_plugins: string[];
 }
 
-export function getDownloads(): Promise<DownloadsResponse> {
-  return api.get<DownloadsResponse>('/api/v1/downloads');
+export function getDownloads(signal?: AbortSignal): Promise<DownloadsResponse> {
+  return api.get<DownloadsResponse>('/api/v1/downloads', { signal });
 }

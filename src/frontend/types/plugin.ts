@@ -10,7 +10,7 @@
 // Shared types
 // ---------------------------------------------------------------------------
 
-export type MediaType = 'movie' | 'show' | 'audiobook' | 'ebook';
+export type MediaType = "movie" | "show" | "audiobook" | "ebook";
 
 export interface MediaItem {
   /** Mortar internal ID in the format "plugin_id:external_id" */
@@ -35,11 +35,11 @@ export interface MediaItem {
 }
 
 export type RequestStatus =
-  | 'pending'
-  | 'approved'
-  | 'available'
-  | 'declined'
-  | 'failed';
+  | "pending"
+  | "approved"
+  | "available"
+  | "declined"
+  | "failed";
 
 export interface Request {
   id: string;
@@ -56,18 +56,18 @@ export interface Request {
 }
 
 export type ActivityEventType =
-  | 'downloaded'
-  | 'added_to_library'
-  | 'requested'
-  | 'approved'
-  | 'declined'
-  | 'failed'
-  | 'deleted';
+  | "downloaded"
+  | "added_to_library"
+  | "requested"
+  | "approved"
+  | "declined"
+  | "failed"
+  | "deleted";
 
 export type ActivityVisibility =
-  | 'all_users'
-  | 'admin_only'
-  | 'requester_and_admin';
+  | "all_users"
+  | "admin_only"
+  | "requester_and_admin";
 
 export interface ActivityEvent {
   id: string;
@@ -95,13 +95,13 @@ export interface DownloadItem {
   speed_bytes_s: number;
   /** null when unknown */
   eta_seconds: number | null;
-  status: 'downloading' | 'paused' | 'queued' | 'processing' | 'failed';
+  status: "downloading" | "paused" | "queued" | "processing" | "failed";
   /** Which *arr triggered this download, if known */
   source_plugin?: string;
 }
 
 export interface HealthStatus {
-  status: 'unknown' | 'healthy' | 'degraded' | 'unreachable';
+  status: "unknown" | "healthy" | "degraded" | "unreachable";
   reachable: boolean;
   latency_ms: number;
   /** ISO 8601 */
@@ -113,7 +113,7 @@ export interface HealthStatus {
 export interface MortarUser {
   id: string;
   username: string;
-  role: 'admin' | 'user';
+  role: "admin" | "user";
   external_accounts?: ExternalAccountLink[];
 }
 
@@ -123,19 +123,39 @@ export interface ExternalAccountLink {
   external_username?: string;
 }
 
+export interface LibraryMatch {
+  plugin_id: string;
+  item: MediaItem;
+  matched_by:
+    | "tmdb_id"
+    | "imdb_id"
+    | "tvdb_id"
+    | "isbn"
+    | "asin"
+    | "title_year";
+}
+
+export interface ContinueWatchingItem {
+  item: MediaItem;
+  progress: number;
+  position_seconds?: number;
+  duration_seconds?: number;
+  last_watched_at: string;
+}
+
 // ---------------------------------------------------------------------------
 // Capability types
 // ---------------------------------------------------------------------------
 
 export type Capability =
-  | 'requests.video'
-  | 'requests.audio'
-  | 'requests.ebook'
-  | 'library.browse'
-  | 'library.exists'
-  | 'library.resume'
-  | 'downloads.read'
-  | 'activity.read';
+  | "requests.video"
+  | "requests.audio"
+  | "requests.ebook"
+  | "library.browse"
+  | "library.exists"
+  | "library.resume"
+  | "downloads.read"
+  | "activity.read";
 
 // Note: spec uses displayName; wire format is display_name for consistency.
 export interface PluginManifest {

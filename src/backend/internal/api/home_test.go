@@ -20,6 +20,10 @@ type mockLibraryPlugin struct {
 	healthErr   error
 	browseItems []plugins.MediaItem
 	browseErr   error
+	getItem     *plugins.MediaItem
+	getItemErr  error
+	playURL     string
+	playErr     error
 }
 
 func (m *mockLibraryPlugin) Manifest() plugins.PluginManifest { return m.manifest }
@@ -38,10 +42,10 @@ func (m *mockLibraryPlugin) Browse(_ plugins.BrowseOptions) (plugins.PagedResult
 	}, nil
 }
 func (m *mockLibraryPlugin) GetItem(_ string) (*plugins.MediaItem, error) {
-	return nil, nil
+	return m.getItem, m.getItemErr
 }
 func (m *mockLibraryPlugin) GetPlayURL(_ plugins.MediaItem, _ plugins.MortarUser) (string, error) {
-	return "", nil
+	return m.playURL, m.playErr
 }
 
 // homeResp mirrors the JSON shape of homeResponse.

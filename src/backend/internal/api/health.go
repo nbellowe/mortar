@@ -4,7 +4,6 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"sort"
 	"time"
 
 	"github.com/nbellowe/mortar/src/backend/internal/plugins"
@@ -29,21 +28,7 @@ type pluginHealthResponse struct {
 // individual plugin failures are surfaced as "unreachable" entries in the
 // payload rather than as HTTP errors.
 func (h *handler) handlePluginHealth(w http.ResponseWriter, _ *http.Request) {
-	// TODO: serve last-known state from in-memory cache (ADR 0004) + background
-	// 60s polling goroutine (ADR 0003). Currently performs live probes on every
-	// request — acceptable for initial implementation only.
-	all := h.registry.All()
-
-	results := make([]pluginHealthResponse, 0, len(all))
-	for _, p := range all {
-		manifest := p.Manifest()
-		entry := buildHealthEntry(manifest, p)
-		results = append(results, entry)
-	}
-
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].PluginID < results[j].PluginID
-	})
+	results := h.health.list()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

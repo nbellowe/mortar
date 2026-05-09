@@ -51,13 +51,16 @@ Each plugin is declared in the owner config file with a `type` and its connectio
 plugins:
   - id: jellyseerr
     type: jellyseerr
-    url: http://jellyseerr:5055
+    url: http://jellyseerr:5055          # internal API URL (server-to-server)
+    external_url: https://seerr.example.com  # browser-accessible URL (optional; defaults to url)
     api_key: ${JELLYSEERR_API_KEY}
 
   - id: jellyfin
     type: jellyfin
-    url: http://jellyfin:8096
+    url: http://jellyfin:8096            # internal API URL (server-to-server)
+    external_url: https://jellyfin.example.com  # browser-accessible URL for images and play links
     api_key: ${JELLYFIN_API_KEY}
+    username: ${JELLYFIN_USER_UUID}      # Jellyfin user UUID for library browsing
 
   - id: sabnzbd
     type: sabnzbd
@@ -74,6 +77,8 @@ plugins:
     url: http://audiobookrequest:8080
     api_key: ${ABR_API_KEY}
 ```
+
+The `url` field is the server-to-server URL used for all API calls from Mortar's backend. The optional `external_url` field specifies the browser-accessible URL used for content that the client loads directly (poster images, play deep-links, admin review links). If omitted, `external_url` defaults to `url`. In homelab deployments where the internal cluster DNS differs from the public hostname, set both fields.
 
 Multiple plugins of the same type are allowed (e.g. two Sonarr instances).
 

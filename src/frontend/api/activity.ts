@@ -15,7 +15,7 @@ export interface ActivityResponse {
  * Returns the activity feed, optionally filtered to events after `since`.
  * The server guarantees events are sorted newest-first.
  */
-export function getActivity(since?: string): Promise<ActivityResponse> {
+export function getActivity(since?: string, signal?: AbortSignal): Promise<ActivityResponse> {
   const params = since ? `?since=${encodeURIComponent(since)}` : '';
-  return api.get<ActivityResponse>(`/api/v1/activity${params}`);
+  return api.get<ActivityResponse>(`/api/v1/activity${params}`, { signal });
 }
